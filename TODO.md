@@ -53,7 +53,7 @@
 
 ### M1.1 Smart snapping, guides, and movement
 
-- [ ] Add **live intersection snapping during drawing/editing** (line/line, line/cubic, cubic/cubic as supported), distinct from the already implemented `Create points at intersections` command.
+- [x] Add **live intersection snapping during drawing/editing** (line/line, line/cubic, cubic/cubic as supported), distinct from the already implemented `Create points at intersections` command. Completed 2026-11-08: exact solver coordinates with endpoint > intersection > midpoint priority, safe overlap skipping, transient previews, stable deduplication, and single-edge Add point insertion. Automated tests pass. Headless Chromium checks confirmed live labels for line/line, line/cubic, cubic/cubic and tangency; exact line/line click commit; Alt/Snap-off bypass; 8 px mouse pickup at 2×/4× zoom; endpoint priority; one-edge Add point split with undo/redo; pan and Shift 45° behavior. Touch, dense-drawing and the remaining interaction checklist remain pending.
 - [ ] Add snap hysteresis and deterministic priority among overlapping candidates; offer cycle/choice for genuinely ambiguous targets. Existing exact vertices and intersections win over grid.
 - [ ] Add 45° and perpendicular smart guides where geometrically meaningful, plus snap-to-guide and guide-intersection support. Do not make distant unrelated edges magnetic.
 - [ ] Add horizontal/vertical rulers with draggable, lockable, hideable, deleteable guides; support exact guide positions and offsets in mm. Keep view/ruler styling independent of geometry.

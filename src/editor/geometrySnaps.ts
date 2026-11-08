@@ -12,6 +12,7 @@ import {
 } from "../geometry/bezier";
 import { distance, type Vec2 } from "../geometry/line";
 import { alignmentReferences, guidesAt, type Snap } from "../geometry/snapping";
+import { intersectionSnaps } from "./intersectionSnaps";
 const midpointCache = new WeakMap<
   PatternDocument,
   Map<string, { point: Vec2; t: number }>
@@ -82,5 +83,10 @@ export function geometrySnaps(
       }
     }
   }
-  return { midpoints, edges, alignedEdges };
+  return {
+    midpoints,
+    edges,
+    alignedEdges,
+    intersections: intersectionSnaps(doc, point, tolerance, movingPoint),
+  };
 }

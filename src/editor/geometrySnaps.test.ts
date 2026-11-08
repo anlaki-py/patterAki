@@ -1,11 +1,13 @@
 import { beforeEach, expect, it } from "vitest";
 import { addPath } from "../document/operations";
-import { emptyDocument } from "../document/schema";
-import { convertToCurve, moveHandle } from "../document/curves";
+import { emptyDocument, documentSchema } from "../document/schema";
+import { convertToCurve, moveHandle, moveVertex } from "../document/curves";
 import { asCubic, segmentPoint } from "../document/segments";
+import { addIntersectionPoints } from "../document/intersections";
 import { cubicLength, splitCubic } from "../geometry/bezier";
 import { resolvePointer } from "./resolvePointer";
 import { insertPointAt } from "./pointTool";
+import { intersectionSnaps } from "./intersectionSnaps";
 import { useEditor } from "./store";
 const options = {
   tool: "line" as const,
@@ -32,6 +34,28 @@ const vertical = () =>
     false,
     id,
   );
+const crossing = () => {
+  let doc = addPath(
+    emptyDocument("test"),
+    [
+      { x: 0, y: 50 },
+      { x: 100, y: 50 },
+    ],
+    false,
+    id,
+  );
+  const horizontal = Object.keys(doc.segments)[0];
+  doc = addPath(
+    doc,
+    [
+      { x: 50, y: 0 },
+      { x: 50, y: 100 },
+    ],
+    false,
+    id,
+  );
+  return { doc, horizontal, vertical: Object.keys(doc.segments)[1] };
+};
 it("aligns a new parallel line to the remote top and bottom endpoints", () => {
   const doc = vertical();
   const start = resolvePointer(doc, { x: 200, y: 2 }, options);
@@ -227,4 +251,182 @@ it("does not advertise a free-floating point insertion off every edge", () => {
   expect(
     resolvePointer(vertical(), { x: 200, y: 2 }, { ...options, tool: "point" }),
   ).toEqual({ point: { x: 200, y: 2 }, label: "" });
+});
+it("T06 gives Line and Polyline the same live crossing that a click commits", () => {
+  const { doc } = crossing();
+  const start = { x: 0, y: 0 };
+  for (const tool of ["line", "polyline"] as const) {
+    const preview = resolvePointer(
+      doc,
+      { x: 52, y: 51 },
+      { ...options, tool, origin: start },
+    );
+    expect(preview).toMatchObject({
+      point: { x: 50, y: 50 },
+      label: "Intersection",
+    });
+    const committed = addPath(doc, [start, preview.point], false, id);
+    const edge = Object.values(committed.segments).at(-1)!;
+    expect(committed.points[edge.to]).toEqual({ x: 50, y: 50 });
+    expect(committed.points[edge.to]).toEqual(preview.point);
+  }
+});
+it("T07 inserts Add point on only the chosen crossing edge", () => {
+  const { doc, horizontal, vertical } = crossing();
+  const snap = resolvePointer(
+    doc,
+    { x: 52, y: 51 },
+    { ...options, tool: "point" },
+  );
+  expect(snap).toMatchObject({
+    point: { x: 50, y: 50 },
+    label: "Intersection",
+    edgeId: horizontal,
+    t: 0.5,
+  });
+  useEditor.getState().load(doc);
+  expect(
+    insertPointAt(snap.point, 8 / 2, { edgeId: snap.edgeId!, t: snap.t! }),
+  ).toBe(true);
+  const state = useEditor.getState();
+  expect(Object.keys(state.document.segments)).toHaveLength(3);
+  expect(state.document.segments[vertical]).toEqual(doc.segments[vertical]);
+  expect(Object.keys(state.document.points)).toHaveLength(5);
+  expect(Object.values(state.document.points)).toContainEqual({ x: 50, y: 50 });
+  expect(state.past).toHaveLength(1);
+  state.undo();
+  expect(useEditor.getState().document).toEqual(doc);
+});
+it("T08 keeps unrelated crossings while dragging and excludes incident edges", () => {
+  const { doc, horizontal } = crossing();
+  const withUnrelated = addPath(
+    doc,
+    [
+      { x: 200, y: 200 },
+      { x: 220, y: 220 },
+    ],
+    false,
+    id,
+  );
+  const extra = Object.values(withUnrelated.segments).at(-1)!;
+  expect(
+    resolvePointer(
+      withUnrelated,
+      { x: 52, y: 51 },
+      {
+        ...options,
+        movingPoint: extra.from,
+      },
+    ),
+  ).toMatchObject({ point: { x: 50, y: 50 }, label: "Intersection" });
+  expect(
+    intersectionSnaps(doc, { x: 52, y: 51 }, 4, doc.segments[horizontal].from),
+  ).toEqual([]);
+  expect(
+    resolvePointer(
+      doc,
+      { x: 52, y: 51 },
+      {
+        ...options,
+        movingPoint: doc.segments[horizontal].from,
+      },
+    ).label,
+  ).not.toBe("Intersection");
+});
+it("T13 keeps a shared crossing endpoint labelled Endpoint and non-insertable", () => {
+  let doc = addPath(
+    emptyDocument("test"),
+    [
+      { x: 0, y: 0 },
+      { x: 100, y: 0 },
+    ],
+    false,
+    id,
+  );
+  doc = addPath(
+    doc,
+    [
+      { x: 0, y: 0 },
+      { x: 0, y: 100 },
+    ],
+    false,
+    id,
+  );
+  expect(resolvePointer(doc, { x: 1, y: 1 }, options)).toEqual({
+    point: { x: 0, y: 0 },
+    label: "Endpoint",
+  });
+  const candidate = intersectionSnaps(doc, { x: 1, y: 1 }, 4)[0];
+  expect(candidate.point).toEqual({ x: 0, y: 0 });
+  useEditor.getState().load(doc);
+  expect(
+    insertPointAt(candidate.point, 4, {
+      edgeId: candidate.edgeId!,
+      t: candidate.t!,
+    }),
+  ).toBe(false);
+  expect(useEditor.getState().past).toHaveLength(0);
+});
+it("T16 keeps intersection previews transient during repeated hover", () => {
+  const { doc } = crossing();
+  const snapshot = structuredClone(doc);
+  useEditor.getState().load(doc);
+  const before = useEditor.getState();
+  expect(resolvePointer(doc, { x: 52, y: 51 }, options).label).toBe(
+    "Intersection",
+  );
+  expect(resolvePointer(doc, { x: 51, y: 51 }, options).label).toBe(
+    "Intersection",
+  );
+  const after = useEditor.getState();
+  expect(doc).toEqual(snapshot);
+  expect(after.document).toBe(before.document);
+  expect(after.revision).toBe(before.revision);
+  expect(after.past).toBe(before.past);
+  expect(after.future).toBe(before.future);
+  expect(after.preview).toBe(before.preview);
+  expect(after.saveStatus).toBe(before.saveStatus);
+});
+it("T17 drops stale crossings after edits and follows undo/redo", () => {
+  const { doc, horizontal } = crossing();
+  const edge = doc.segments[horizontal];
+  let moved = moveVertex(doc, edge.from, {
+    x: doc.points[edge.from].x,
+    y: 60,
+  });
+  moved = moveVertex(moved, edge.to, { x: doc.points[edge.to].x, y: 60 });
+  expect(resolvePointer(doc, { x: 51, y: 51 }, options)).toMatchObject({
+    point: { x: 50, y: 50 },
+    label: "Intersection",
+  });
+  expect(resolvePointer(moved, { x: 51, y: 51 }, options).label).not.toBe(
+    "Intersection",
+  );
+  expect(resolvePointer(moved, { x: 51, y: 61 }, options)).toMatchObject({
+    point: { x: 50, y: 60 },
+    label: "Intersection",
+  });
+  useEditor.getState().load(doc);
+  useEditor.getState().commit(moved);
+  expect(
+    resolvePointer(useEditor.getState().document, { x: 51, y: 61 }, options)
+      .point,
+  ).toEqual({ x: 50, y: 60 });
+  useEditor.getState().undo();
+  expect(
+    resolvePointer(useEditor.getState().document, { x: 51, y: 51 }, options)
+      .point,
+  ).toEqual({ x: 50, y: 50 });
+  useEditor.getState().redo();
+  expect(
+    resolvePointer(useEditor.getState().document, { x: 51, y: 61 }, options)
+      .point,
+  ).toEqual({ x: 50, y: 60 });
+});
+it("T18 keeps the explicit intersection command splitting both participants", () => {
+  const { doc, horizontal } = crossing();
+  const result = addIntersectionPoints(doc, horizontal, id);
+  expect(result.splitCount).toBe(2);
+  expect(Object.keys(result.document.segments)).toHaveLength(4);
+  expect(documentSchema.safeParse(result.document).success).toBe(true);
 });

@@ -51,6 +51,7 @@ export function snapPoint(
     midpoints?: Snap[];
     edges?: Snap[];
     alignedEdges?: Snap[];
+    intersections?: Snap[];
     requireEdge?: boolean;
   } = {},
 ): Snap {
@@ -60,6 +61,8 @@ export function snapPoint(
       .sort((a, b) => distance(point, a.point) - distance(point, b.point))[0];
   const exact = nearest(points.map((p) => ({ point: p, label: "Endpoint" })));
   if (exact) return exact;
+  const crossing = nearest(extra.intersections ?? []);
+  if (crossing) return crossing;
   const midpoint = nearest([
     ...lines.map(([a, b]) => ({ point: lerp(a, b, 0.5), label: "Midpoint" })),
     ...(extra.midpoints ?? []),
