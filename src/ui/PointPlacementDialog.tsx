@@ -11,6 +11,8 @@ import {
   type PatternDocument,
 } from "../document/schema";
 import { useEditor } from "../editor/store";
+import { commands } from "../editor/commands";
+import { commandProps } from "./CommandControls";
 import { DraggableModal } from "./DraggableModal";
 export type PlacementSession = {
   document: PatternDocument;
@@ -70,6 +72,12 @@ export function PointPlacementDialog({
       setCommitError((e as Error).message);
     }
   };
+  const applyCommand = commands.applyPoint.bind({
+    execute: apply,
+    enabled: () =>
+      !!result.preview && useEditor.getState().revision === revision,
+  });
+  const cancelCommand = commands.cancelDialog.bind({ execute: onClose });
   return (
     <DraggableModal
       title={target.existing ? "Position point" : "Add point precisely"}
@@ -78,7 +86,7 @@ export function PointPlacementDialog({
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          apply();
+          applyCommand.run();
         }}
       >
         <Stack gap="sm">
@@ -127,13 +135,10 @@ export function PointPlacementDialog({
             Drag the title to move this window. Enter applies; Escape cancels.
           </Text>
           <Group justify="flex-end">
-            <Button variant="default" onClick={onClose}>
-              Cancel
+            <Button variant="default" {...commandProps(cancelCommand)}>
+              {cancelCommand.label}
             </Button>
-            <Button
-              type="submit"
-              disabled={!result.preview || currentRevision !== revision}
-            >
+            <Button type="submit" disabled={!applyCommand.enabled()}>
               {target.existing ? "Apply position" : "Add point"}
             </Button>
           </Group>

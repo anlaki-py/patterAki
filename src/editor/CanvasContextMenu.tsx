@@ -6,7 +6,6 @@ import {
   type SVGProps,
 } from "react";
 import { Button, Group, Menu, Text } from "@mantine/core";
-import { notifications } from "@mantine/notifications";
 import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import type { Vec2 } from "../geometry/line";
 import type { AnnotationKind } from "../document/annotationSchema";
@@ -15,8 +14,9 @@ import { EdgeMenuItems } from "../ui/EdgeMenuItems";
 import { MarkMenuItems } from "../ui/MarkMenuItems";
 import { LengthEditor } from "../ui/Inspector";
 import { DraggableModal } from "../ui/DraggableModal";
-import { executeEdgeActions, type EdgeAction } from "./edgeActions";
-import { deleteSelection } from "./selectionActions";
+import { commands } from "./commands";
+import type { BoundCommand } from "./command";
+import { CommandMenuItem, notifyCommand } from "../ui/CommandControls";
 import { contextSelection } from "./selection";
 import { contextTarget, type ContextHit } from "./contextTarget";
 import { useEditor } from "./store";
@@ -77,29 +77,41 @@ export function CanvasContextMenu({
     setTarget(next);
     return next;
   };
-  const action = (id: string, kind: EdgeAction) => {
-    try {
-      const ids = contextSelection(useEditor.getState().selected, id);
-      if (kind === "delete") deleteSelection(ids);
-      else {
-        const message = executeEdgeActions(
-          ids.filter((key) => !!s.document.segments[key]),
-          kind,
+  const report = (command: BoundCommand): BoundCommand => ({
+    ...command,
+    run: () => {
+      notifyCommand(command).run();
+      setOpened(false);
+    },
+  });
+  const edgeCommands = (target: Target & { id: string }) => ({
+    length: commands.changeLength.bind({
+      enabled: () => {
+        const state = useEditor.getState();
+        return (
+          state.selected.length === 1 &&
+          state.document.segments[target.id]?.kind === "line"
         );
-        useEditor.setState({
-          selected: ids.filter(
-            (key) =>
-              !!useEditor.getState().document.segments[key] ||
-              !!useEditor.getState().document.annotations[key],
-          ),
-        });
-        if (message) notifications.show({ message });
-      }
-    } catch (e) {
-      notifications.show({ color: "red", message: (e as Error).message });
-    }
-    setOpened(false);
-  };
+      },
+      execute: () => {
+        setOpened(false);
+        setLengthTarget(
+          activate({ kind: "edge", id: target.id }, target.point),
+        );
+      },
+    }),
+    point: commands.exactPoint.bind({
+      enabled: () => useEditor.getState().selected.length === 1,
+      execute: () => {
+        activate({ kind: "edge", id: target.id }, target.point);
+        exact(target.point, target.id);
+      },
+    }),
+    intersections: report(commands.intersections.bind()),
+    curve: report(commands.curve.bind()),
+    reset: report(commands.reset.bind()),
+    delete: report(commands.delete.bind()),
+  });
   const exact = (point: Vec2, id: string) => {
     setOpened(false);
     onExact(point, 9 / scale, id);
@@ -113,7 +125,7 @@ export function CanvasContextMenu({
     onEditMark(id);
   };
   const closeLength = () => {
-    s.cancel();
+    commands.cancel.bind().run();
     setLengthTarget(null);
   };
   const lengthValid =
@@ -177,30 +189,23 @@ export function CanvasContextMenu({
             <EdgeMenuItems
               curved={curved}
               count={s.selected.length}
-              onAction={(kind) => action(target.id, kind)}
-              onLength={() => {
-                setOpened(false);
-                setLengthTarget(target);
-              }}
-              onPoint={() => exact(target.point, target.id)}
+              actions={edgeCommands(target)}
             />
           )}
           {target?.kind === "annotation" && (
             <>
               <Menu.Label>Pattern mark</Menu.Label>
-              <Menu.Item
+              <CommandMenuItem
+                command={commands.editMark.bind({
+                  execute: () => edit(target.id),
+                })}
                 leftSection={<Pencil size={16} />}
-                onClick={() => edit(target.id)}
-              >
-                Edit mark…
-              </Menu.Item>
-              <Menu.Item
+              />
+              <CommandMenuItem
+                command={report(commands.delete.bind())}
                 color="red"
                 leftSection={<Trash2 size={16} />}
-                onClick={() => action(target.id, "delete")}
-              >
-                Delete {s.selected.length > 1 ? "selection" : "mark"}
-              </Menu.Item>
+              />
             </>
           )}
           {target?.kind === "empty" && (
@@ -224,23 +229,13 @@ export function CanvasContextMenu({
               <EdgeMenuItems
                 curved={curved}
                 count={s.selected.length}
-                onAction={(kind) => {
-                  s.cancel();
-                  action(selectedEdge.id, kind);
-                }}
-                onLength={() =>
-                  setLengthTarget(
-                    activate(
-                      { kind: "edge", id: selectedEdge.id },
-                      segmentPoint(s.document, selectedEdge, 0.5),
-                    ),
-                  )
-                }
-                onPoint={() => {
-                  const p = segmentPoint(s.document, selectedEdge, 0.5);
-                  activate({ kind: "edge", id: selectedEdge.id }, p);
-                  exact(p, selectedEdge.id);
-                }}
+                actions={edgeCommands({
+                  kind: "edge",
+                  id: selectedEdge.id,
+                  point: segmentPoint(s.document, selectedEdge, 0.5),
+                  revision: s.revision,
+                  cancelVersion: s.cancelVersion,
+                })}
               />
             )}
           </Menu.Dropdown>
@@ -252,19 +247,17 @@ export function CanvasContextMenu({
           <Menu.Dropdown>
             {selectedMark && (
               <>
-                <Menu.Item
+                <CommandMenuItem
+                  command={commands.editMark.bind({
+                    execute: () => edit(selectedMark.id),
+                  })}
                   leftSection={<Pencil size={16} />}
-                  onClick={() => edit(selectedMark.id)}
-                >
-                  Edit selected mark…
-                </Menu.Item>
-                <Menu.Item
+                />
+                <CommandMenuItem
+                  command={report(commands.delete.bind())}
                   color="red"
                   leftSection={<Trash2 size={16} />}
-                  onClick={() => action(selectedMark.id, "delete")}
-                >
-                  Delete selected mark
-                </Menu.Item>
+                />
                 <Menu.Divider />
               </>
             )}

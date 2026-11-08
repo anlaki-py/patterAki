@@ -31,12 +31,13 @@ import {
 } from "lucide-react";
 import { useEditor } from "../editor/store";
 import {
-  activateTool,
+  commands,
+  dispatchShortcut,
   editCommands,
-  isEditingText,
   toolCommands,
 } from "../editor/commands";
 import { EditorViewport } from "../editor/EditorViewport";
+import { CommandMenuItem, commandProps } from "../ui/CommandControls";
 import { Inspector } from "../ui/Inspector";
 import { emptyDocument, parseProject } from "../document/schema";
 import { saveNow, startPersistence } from "../persistence/autosave";
@@ -67,45 +68,6 @@ export function App() {
   const file = useRef<HTMLInputElement>(null);
   const { toggleColorScheme } = useMantineColorScheme();
   useEffect(startPersistence, []);
-  useEffect(() => {
-    const keydown = (e: KeyboardEvent) => {
-      if (isEditingText(e.target)) return;
-      const key = e.key.toLowerCase(),
-        mod = e.ctrlKey || e.metaKey;
-      if (mod && key === "a") {
-        e.preventDefault();
-        editCommands.find((command) => command.id === "select-all")!.run();
-        return;
-      }
-      if (mod && key === "s") {
-        e.preventDefault();
-        void saveNow();
-        return;
-      }
-      if (mod && key === "z") {
-        e.preventDefault();
-        (e.shiftKey ? editCommands[1] : editCommands[0]).run();
-        return;
-      }
-      if (mod && key === "y") {
-        e.preventDefault();
-        editCommands[1].run();
-        return;
-      }
-      if (mod || e.altKey) return;
-      const tool = toolCommands.find((t) => t.key === key);
-      if (tool) {
-        e.preventDefault();
-        activateTool(tool.id);
-      }
-      if (key === "delete" || key === "backspace") {
-        e.preventDefault();
-        editCommands[2].run();
-      }
-    };
-    window.addEventListener("keydown", keydown);
-    return () => window.removeEventListener("keydown", keydown);
-  }, []);
   const replaceProject = (action: () => void) => {
     modals.openConfirmModal({
       title: "Replace the current workspace?",
@@ -177,6 +139,34 @@ export function App() {
         </Stack>
       ),
     });
+  const fileCommands = [
+    commands.newProject.bind({
+      execute: () =>
+        replaceProject(() =>
+          useEditor.getState().load(emptyDocument(createId())),
+        ),
+    }),
+    commands.importProject.bind({ execute: () => file.current?.click() }),
+    commands.save.bind({ execute: saveNow }),
+    commands.exportProject.bind({ execute: exportJson }),
+  ];
+  const themeCommand = commands.theme.bind({ execute: toggleColorScheme });
+  const propertiesCommand = commands.properties.bind({
+    execute: () => setProperties((visible) => !visible),
+  });
+  const helpCommand = commands.help.bind({ execute: help });
+  useEffect(() => {
+    const keydown = (event: KeyboardEvent) => {
+      if (useEditor.getState().ready)
+        dispatchShortcut(event, [
+          ...toolCommands,
+          ...editCommands,
+          ...fileCommands,
+        ]);
+    };
+    window.addEventListener("keydown", keydown);
+    return () => window.removeEventListener("keydown", keydown);
+  });
   if (!s.ready) return <Text p="md">Opening local pattern…</Text>;
   return (
     <div className="app-shell">
@@ -187,20 +177,9 @@ export function App() {
               <Button variant="subtle">File</Button>
             </Menu.Target>
             <Menu.Dropdown>
-              <Menu.Item
-                onClick={() =>
-                  replaceProject(() => s.load(emptyDocument(createId())))
-                }
-              >
-                New project
-              </Menu.Item>
-              <Menu.Item onClick={() => file.current?.click()}>
-                Import JSON…
-              </Menu.Item>
-              <Menu.Item onClick={() => void saveNow()}>
-                Save locally · Ctrl/Cmd+S
-              </Menu.Item>
-              <Menu.Item onClick={exportJson}>Export editable JSON</Menu.Item>
+              {fileCommands.map((command) => (
+                <CommandMenuItem key={command.id} command={command} />
+              ))}
             </Menu.Dropdown>
           </Menu>
           <Menu>
@@ -208,10 +187,8 @@ export function App() {
               <Button variant="subtle">Edit</Button>
             </Menu.Target>
             <Menu.Dropdown>
-              {editCommands.map((c) => (
-                <Menu.Item key={c.id} disabled={!c.enabled()} onClick={c.run}>
-                  {c.label} · {c.shortcut}
-                </Menu.Item>
+              {editCommands.map((command) => (
+                <CommandMenuItem key={command.id} command={command} />
               ))}
             </Menu.Dropdown>
           </Menu>
@@ -220,15 +197,11 @@ export function App() {
               <Button variant="subtle">View</Button>
             </Menu.Target>
             <Menu.Dropdown>
-              <Menu.Item onClick={toggleColorScheme}>
-                Toggle light / dark
-              </Menu.Item>
-              <Menu.Item onClick={() => useEditor.setState({ grid: !s.grid })}>
-                Toggle grid
-              </Menu.Item>
-              <Menu.Item onClick={() => setProperties(!properties)}>
-                {properties ? "Hide properties" : "Show properties"}
-              </Menu.Item>
+              {[themeCommand, commands.grid.bind(), propertiesCommand].map(
+                (command) => (
+                  <CommandMenuItem key={command.id} command={command} />
+                ),
+              )}
             </Menu.Dropdown>
           </Menu>
           <Menu>
@@ -236,15 +209,13 @@ export function App() {
               <Button variant="subtle">Tools</Button>
             </Menu.Target>
             <Menu.Dropdown>
-              {toolCommands.map((t) => (
-                <Menu.Item key={t.id} onClick={() => activateTool(t.id)}>
-                  {t.label} · {t.key.toUpperCase()}
-                </Menu.Item>
+              {toolCommands.map((command) => (
+                <CommandMenuItem key={command.id} command={command} />
               ))}
             </Menu.Dropdown>
           </Menu>
-          <Button variant="subtle" onClick={help}>
-            Help
+          <Button variant="subtle" {...commandProps(helpCommand)}>
+            {helpCommand.label}
           </Button>
         </Group>
         <Text size="xs" truncate className="project-title">
@@ -255,12 +226,12 @@ export function App() {
         {toolCommands.map((t) => {
           const Icon = icons[t.id];
           return (
-            <Tooltip key={t.id} label={`${t.label} (${t.key.toUpperCase()})`}>
+            <Tooltip key={t.id} label={`${t.label} (${t.shortcut})`}>
               <Button
                 variant={s.tool === t.id ? "light" : "default"}
                 aria-pressed={s.tool === t.id}
                 leftSection={<Icon size={16} />}
-                onClick={() => activateTool(t.id)}
+                {...commandProps(t)}
               >
                 {t.label}
               </Button>
@@ -275,8 +246,7 @@ export function App() {
             <ActionIcon
               variant="default"
               aria-label={editCommands[i].label}
-              disabled={!editCommands[i].enabled()}
-              onClick={editCommands[i].run}
+              {...commandProps(editCommands[i])}
             >
               <Icon size={16} />
             </ActionIcon>
@@ -284,26 +254,24 @@ export function App() {
         ))}
         <Switch
           size="xs"
-          label="Snap"
+          label={commands.snap.label}
           checked={s.snap}
-          onChange={(e) =>
-            useEditor.setState({ snap: e.currentTarget.checked })
-          }
+          onChange={() => commands.snap.bind().run()}
         />
         <ActionIcon
           variant="default"
           aria-label="Toggle color scheme"
-          onClick={toggleColorScheme}
+          {...commandProps(themeCommand)}
         >
           <Moon size={16} />
         </ActionIcon>
         <Button
           variant="default"
           leftSection={<SlidersHorizontal size={16} />}
-          onClick={() => setProperties(!properties)}
+          {...commandProps(propertiesCommand)}
           aria-expanded={properties}
         >
-          Properties
+          {propertiesCommand.label}
         </Button>
       </Group>
       <main className="main-area">
@@ -352,7 +320,11 @@ export function App() {
       </Group>
       <Drawer
         opened={!!mobile && properties}
-        onClose={() => setProperties(false)}
+        onClose={() =>
+          commands.hideProperties
+            .bind({ execute: () => setProperties(false) })
+            .run()
+        }
         title="Pattern properties"
         position={mobile ? "bottom" : "right"}
         size={mobile ? "75%" : "sm"}

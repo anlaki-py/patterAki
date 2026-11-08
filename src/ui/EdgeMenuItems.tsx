@@ -1,18 +1,22 @@
 import { Menu } from "@mantine/core";
 import { Plus, Ruler, Spline, Trash2, Undo2, Waypoints } from "lucide-react";
-import type { EdgeAction } from "../editor/edgeActions";
+import type { BoundCommand } from "../editor/command";
+import { CommandMenuItem } from "./CommandControls";
 export function EdgeMenuItems({
   curved,
   count,
-  onAction,
-  onLength,
-  onPoint,
+  actions,
 }: {
   curved: boolean;
   count: number;
-  onAction: (action: EdgeAction) => void;
-  onLength: () => void;
-  onPoint: () => void;
+  actions: {
+    length: BoundCommand;
+    point: BoundCommand;
+    intersections: BoundCommand;
+    curve: BoundCommand;
+    reset: BoundCommand;
+    delete: BoundCommand;
+  };
 }) {
   return (
     <>
@@ -21,52 +25,28 @@ export function EdgeMenuItems({
           ? `${count} selected items`
           : `${curved ? "Curve" : "Line"} actions`}
       </Menu.Label>
-      <Menu.Item
+      <CommandMenuItem
+        command={actions.length}
         leftSection={<Ruler size={16} />}
-        disabled={curved || count > 1}
-        onClick={onLength}
-      >
-        {curved ? "Change length (straight edges only)" : "Change length…"}
-      </Menu.Item>
-      <Menu.Item
+      />
+      <CommandMenuItem
+        command={actions.point}
         leftSection={<Plus size={16} />}
-        onClick={onPoint}
-        disabled={count > 1}
-      >
-        Point at exact distance…
-      </Menu.Item>
-      <Menu.Item
+      />
+      <CommandMenuItem
+        command={actions.intersections}
         leftSection={<Waypoints size={16} />}
-        disabled={count > 1}
-        onClick={() => onAction("intersections")}
-      >
-        Create points at intersections
-      </Menu.Item>
-      {curved ? (
-        <Menu.Item
-          leftSection={<Undo2 size={16} />}
-          onClick={() => onAction("reset")}
-        >
-          {count > 1
-            ? "Reset selected curves / remove handles"
-            : "Reset curve / remove handles"}
-        </Menu.Item>
-      ) : (
-        <Menu.Item
-          leftSection={<Spline size={16} />}
-          onClick={() => onAction("curve")}
-        >
-          Convert to curve
-        </Menu.Item>
-      )}
+      />
+      <CommandMenuItem
+        command={curved ? actions.reset : actions.curve}
+        leftSection={curved ? <Undo2 size={16} /> : <Spline size={16} />}
+      />
       <Menu.Divider />
-      <Menu.Item
+      <CommandMenuItem
+        command={actions.delete}
         color="red"
         leftSection={<Trash2 size={16} />}
-        onClick={() => onAction("delete")}
-      >
-        {count > 1 ? `Delete ${count} selected items` : "Delete edge"}
-      </Menu.Item>
+      />
     </>
   );
 }

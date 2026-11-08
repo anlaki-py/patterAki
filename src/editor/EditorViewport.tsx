@@ -17,14 +17,16 @@ import { Button, Group, NumberInput, Text } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useEditor } from "./store";
 import { addPath, splitLine } from "../document/operations";
-import { angle, distance, endpoint, type Vec2 } from "../geometry/line";
+import { angle, distance, type Vec2 } from "../geometry/line";
 import { type Snap } from "../geometry/snapping";
 import {
   formatLength,
   unitFactor,
   type PatternDocument,
 } from "../document/schema";
-import { isEditingText } from "./commands";
+import { commands, dispatchShortcut, toolCommands } from "./commands";
+import { bindDraftCommands } from "./draftCommands";
+import { commandProps } from "../ui/CommandControls";
 type Drag = {
   pointer: number;
   pointId?: string;
@@ -75,42 +77,60 @@ export function EditorViewport() {
       notifications.show({ color: "red", message: (e as Error).message });
     }
   };
+  const draftActions = bindDraftCommands({
+    draft,
+    exact,
+    degrees,
+    width,
+    height,
+    factor,
+    commitPath,
+    setDraft,
+    clearExact: () => setExact(""),
+  });
+  const escape = commands.escape.bind({
+    execute: () => {
+      const active =
+        draft.length > 0 || drag || selectionDrag.active() || s.preview;
+      commands.cancel.bind().run();
+      if (!active)
+        toolCommands.find((command) => command.id === "select")!.run();
+    },
+  });
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      if (isEditingText(e.target)) return;
-      if (e.code === "Space") {
-        e.preventDefault();
-        space.current = true;
-      }
-      if ((e.key === "Backspace" || e.key === "Delete") && draft.length) {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        setDraft(draft.slice(0, -1));
-        return;
-      }
-      if (e.key === "Escape") {
-        const active =
-          draft.length > 0 || drag || selectionDrag.active() || s.preview;
-        s.cancel();
-        if (!active) useEditor.setState({ tool: "select", selected: [] });
-      }
-      if (
-        (e.ctrlKey || e.metaKey) &&
-        e.key.toLowerCase() === "z" &&
-        (draft.length || drag || selectionDrag.active())
-      ) {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        s.cancel();
-      }
-      if (e.key === "Enter" && draft.length > 1) {
-        e.preventDefault();
-        commitPath(draft);
-      } else if (e.key === "Enter" && s.selected.length === 1) {
-        if (s.document.annotations[s.selected[0]])
-          annotations.edit(s.selected[0]);
-        else document.getElementById("line-length")?.focus();
-      }
+      const transient = draft.length > 0 || !!drag || selectionDrag.active();
+      const local = [
+        commands.temporaryPan.bind({
+          execute: () => {
+            space.current = true;
+          },
+        }),
+        escape,
+        ...(draft.length ? [draftActions.removePoint] : []),
+        ...(transient
+          ? [
+              commands.cancelGesture.bind({
+                execute: () => commands.cancel.bind().run(),
+              }),
+            ]
+          : []),
+        ...(draft.length > 1
+          ? [draftActions.finish]
+          : s.selected.length === 1
+            ? [
+                s.document.annotations[s.selected[0]]
+                  ? commands.editMark.bind({
+                      execute: () => annotations.edit(s.selected[0]),
+                    })
+                  : commands.editLength.bind({
+                      execute: () =>
+                        document.getElementById("line-length")?.focus(),
+                    }),
+              ]
+            : []),
+      ];
+      if (dispatchShortcut(e, local)) e.stopImmediatePropagation();
     };
     const up = (e: KeyboardEvent) => {
       if (e.code === "Space") space.current = false;
@@ -285,23 +305,32 @@ export function EditorViewport() {
   return (
     <div className="workspace">
       <Group className="workspace-controls" gap="xs" p="xs">
-        <Button variant="default" onClick={fit}>
-          Fit all
+        <Button
+          variant="default"
+          {...commandProps(commands.fit.bind({ execute: fit }))}
+        >
+          {commands.fit.label}
         </Button>
         <Button
           variant="default"
-          onClick={() => setView({ x: 40, y: 40, scale: 2 })}
+          {...commandProps(
+            commands.resetView.bind({
+              execute: () => setView({ x: 40, y: 40, scale: 2 }),
+            }),
+          )}
         >
-          Reset view
+          {commands.resetView.label}
         </Button>
         <Text size="xs">{Math.round((view.scale / 2) * 100)}%</Text>
         {draft.length > 0 && (
-          <Button variant="subtle" onClick={() => s.cancel()}>
-            Cancel draft
+          <Button variant="subtle" {...commandProps(commands.cancel.bind())}>
+            {commands.cancel.label}
           </Button>
         )}
         {s.tool === "polyline" && draft.length > 1 && (
-          <Button onClick={() => commitPath(draft)}>Finish line</Button>
+          <Button {...commandProps(draftActions.finish)}>
+            {draftActions.finish.label}
+          </Button>
         )}
       </Group>
       {origin && (s.tool === "line" || s.tool === "polyline") && (
@@ -318,24 +347,8 @@ export function EditorViewport() {
             onChange={setDegrees}
             w={140}
           />
-          <Button
-            disabled={
-              typeof exact !== "number" ||
-              exact <= 0 ||
-              typeof degrees !== "number"
-            }
-            onClick={() => {
-              if (typeof exact === "number" && typeof degrees === "number") {
-                const end = endpoint(origin, exact * factor, degrees);
-                if (s.tool === "line") commitPath([origin, end]);
-                else {
-                  setDraft([...draft, end]);
-                  setExact("");
-                }
-              }
-            }}
-          >
-            Add exact line
+          <Button {...commandProps(draftActions.exactLine)}>
+            {draftActions.exactLine.label}
           </Button>
         </Group>
       )}
@@ -353,30 +366,8 @@ export function EditorViewport() {
             onChange={setHeight}
             w={130}
           />
-          <Button
-            disabled={
-              typeof width !== "number" ||
-              width <= 0 ||
-              typeof height !== "number" ||
-              height <= 0
-            }
-            onClick={() => {
-              if (typeof width === "number" && typeof height === "number")
-                commitPath(
-                  [
-                    origin,
-                    { x: origin.x + width * factor, y: origin.y },
-                    {
-                      x: origin.x + width * factor,
-                      y: origin.y + height * factor,
-                    },
-                    { x: origin.x, y: origin.y + height * factor },
-                  ],
-                  true,
-                );
-            }}
-          >
-            Create rectangle
+          <Button {...commandProps(draftActions.rectangle)}>
+            {draftActions.rectangle.label}
           </Button>
         </Group>
       )}
@@ -514,9 +505,13 @@ export function EditorViewport() {
           </Text>
           <Button
             variant="default"
-            onClick={() => placement.open(cursor.point, 22 / view.scale)}
+            {...commandProps(
+              commands.exactPoint.bind({
+                execute: () => placement.open(cursor.point, 22 / view.scale),
+              }),
+            )}
           >
-            Exact distances…
+            {commands.exactPoint.label}
           </Button>
         </Group>
       )}

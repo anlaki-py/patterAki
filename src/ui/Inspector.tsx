@@ -1,6 +1,4 @@
 import { CurveProperties } from "./CurveProperties";
-import { convertToCurve } from "../document/curves";
-import { createId } from "../editor/ids";
 import {
   Button,
   NumberInput,
@@ -11,9 +9,9 @@ import {
   TextInput,
 } from "@mantine/core";
 import { useState } from "react";
-import { notifications } from "@mantine/notifications";
 import { useEditor } from "../editor/store";
-import { changeLength, splitLine } from "../document/operations";
+import { commands } from "../editor/commands";
+import { commandProps, notifyCommand } from "./CommandControls";
 import { distance, type Anchor } from "../geometry/line";
 import { formatLength, unitFactor } from "../document/schema";
 export function Inspector() {
@@ -28,21 +26,21 @@ export function Inspector() {
         Properties
       </Text>
       <TextInput
-        label="Project name"
+        label={commands.rename.label}
         value={s.document.name}
         maxLength={120}
         onChange={(e) => {
           const name = e.currentTarget.value;
-          if (name.trim()) s.commit({ ...s.document, name });
+          commands.rename.bind(name).run();
         }}
       />
       <Select
-        label="Display units"
+        label={commands.units.label}
         data={["mm", "cm", "in"]}
         value={s.document.unitsDisplay}
         onChange={(v) => {
           if (v === "mm" || v === "cm" || v === "in")
-            s.commit({ ...s.document, unitsDisplay: v });
+            commands.units.bind(v).run();
         }}
       />
       {s.selected.length > 1 ? (
@@ -54,8 +52,8 @@ export function Inspector() {
       ) : annotation ? (
         <Text size="sm">
           {annotation.kind === "text" ? annotation.text : annotation.kind}{" "}
-          selected. Double-click the mark or use Marks → Edit selected mark to
-          edit its size and direction. Drag it to move.
+          selected. Double-click the mark or use Marks → Edit mark to edit its
+          size and direction. Drag it to move.
         </Text>
       ) : edge ? (
         edge.kind === "cubic" ? (
@@ -99,9 +97,9 @@ export function LengthEditor({
     setValue(v);
     setAnchor(a);
     try {
-      if (typeof v !== "number") throw new Error("Enter a positive length.");
-      const doc = changeLength(s.document, edge.id, v * unitFactor[units], a);
-      useEditor.setState({ preview: doc });
+      commands.previewLength
+        .bind({ value: v, factor: unitFactor[units], anchor: a })
+        .run();
       setError("");
     } catch (e) {
       useEditor.setState({ preview: null });
@@ -111,7 +109,7 @@ export function LengthEditor({
   const apply = () => {
     if (s.preview && !error) {
       try {
-        s.commit(s.preview);
+        commands.applyLength.bind().run();
         onApplied?.();
       } catch (e) {
         setError((e as Error).message);
@@ -124,9 +122,9 @@ export function LengthEditor({
       {!lengthOnly && (
         <Button
           variant="default"
-          onClick={() => s.commit(convertToCurve(s.document, edge.id))}
+          {...commandProps(notifyCommand(commands.curve.bind()))}
         >
-          Convert to curve
+          {commands.curve.label}
         </Button>
       )}
       <NumberInput
@@ -138,7 +136,7 @@ export function LengthEditor({
         onKeyDown={(e) => {
           if (e.key === "Enter") apply();
           if (e.key === "Escape") {
-            s.cancel();
+            commands.cancel.bind().run();
             setValue(length / unitFactor[units]);
             setError("");
           }
@@ -160,8 +158,11 @@ export function LengthEditor({
           ? "Keep the midpoint fixed; move both ends equally."
           : `Keep the ${anchor} endpoint fixed; move the other end.`}
       </Text>
-      <Button onClick={apply} disabled={!s.preview || !!error}>
-        Apply length
+      <Button
+        onClick={apply}
+        disabled={!commands.applyLength.bind().enabled() || !!error}
+      >
+        {commands.applyLength.label}
       </Button>
       {!lengthOnly && (
         <>
@@ -172,27 +173,16 @@ export function LengthEditor({
           />
           <Button
             variant="default"
-            onClick={() => {
-              try {
-                if (typeof split !== "number")
-                  throw new Error("Enter a distance inside the line.");
-                s.commit(
-                  splitLine(
-                    s.document,
-                    edge.id,
-                    (split * unitFactor[units]) / length,
-                    createId,
-                  ),
-                );
-              } catch (e) {
-                notifications.show({
-                  color: "red",
-                  message: (e as Error).message,
-                });
-              }
-            }}
+            {...commandProps(
+              notifyCommand(
+                commands.insertPoint.bind({
+                  value: split,
+                  factor: unitFactor[units],
+                }),
+              ),
+            )}
           >
-            Insert point
+            {commands.insertPoint.label}
           </Button>
         </>
       )}

@@ -1,16 +1,11 @@
 import { Button, NumberInput, Stack, Text } from "@mantine/core";
 import { useState } from "react";
-import { notifications } from "@mantine/notifications";
 import { useEditor } from "../editor/store";
-import { straightenCurve } from "../document/curves";
+import { commands } from "../editor/commands";
+import { commandProps, notifyCommand } from "./CommandControls";
 import { segmentLength } from "../document/segments";
-import {
-  applyPointPlacement,
-  placementOnEdge,
-} from "../document/pointPlacement";
 import { distance } from "../geometry/line";
 import { formatLength, unitFactor } from "../document/schema";
-import { createId } from "../editor/ids";
 export function CurveProperties() {
   const s = useEditor(),
     doc = s.preview ?? s.document,
@@ -39,33 +34,22 @@ export function CurveProperties() {
       />
       <Button
         variant="default"
-        onClick={() => {
-          try {
-            if (typeof split !== "number")
-              throw new Error("Enter an arc distance inside the curve.");
-            const target = placementOnEdge(s.document, edge.id, 0.5, {
-              pointId: createId(),
-              newEdgeId: createId(),
-            });
-            s.commit(
-              applyPointPlacement(
-                s.document,
-                target,
-                split * unitFactor[units],
-              ),
-            );
-          } catch (e) {
-            notifications.show({ color: "red", message: (e as Error).message });
-          }
-        }}
+        {...commandProps(
+          notifyCommand(
+            commands.insertPoint.bind({
+              value: split,
+              factor: unitFactor[units],
+            }),
+          ),
+        )}
       >
-        Insert point
+        {commands.insertPoint.label}
       </Button>
       <Button
         variant="default"
-        onClick={() => s.commit(straightenCurve(s.document, edge.id))}
+        {...commandProps(notifyCommand(commands.reset.bind()))}
       >
-        Convert to straight line
+        {commands.reset.label}
       </Button>
     </Stack>
   );

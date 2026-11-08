@@ -7,6 +7,15 @@ import {
   Type,
 } from "lucide-react";
 import type { AnnotationKind } from "../document/annotationSchema";
+import { commands } from "../editor/commands";
+import { CommandMenuItem } from "./CommandControls";
+const icons = {
+  text: Type,
+  arrow: ArrowRight,
+  grainline: ArrowLeftRight,
+  fold: FoldVertical,
+  drill: Crosshair,
+};
 export function MarkMenuItems({
   onAdd,
 }: {
@@ -15,33 +24,16 @@ export function MarkMenuItems({
   return (
     <>
       <Menu.Label>Add a pattern mark</Menu.Label>
-      <Menu.Item leftSection={<Type size={16} />} onClick={() => onAdd("text")}>
-        Text / piece label…
-      </Menu.Item>
-      <Menu.Item
-        leftSection={<ArrowRight size={16} />}
-        onClick={() => onAdd("arrow")}
-      >
-        Arrow…
-      </Menu.Item>
-      <Menu.Item
-        leftSection={<ArrowLeftRight size={16} />}
-        onClick={() => onAdd("grainline")}
-      >
-        Grainline…
-      </Menu.Item>
-      <Menu.Item
-        leftSection={<FoldVertical size={16} />}
-        onClick={() => onAdd("fold")}
-      >
-        Place on fold guide…
-      </Menu.Item>
-      <Menu.Item
-        leftSection={<Crosshair size={16} />}
-        onClick={() => onAdd("drill")}
-      >
-        Drill point / cross…
-      </Menu.Item>
+      {(Object.keys(icons) as AnnotationKind[]).map((kind) => {
+        const Icon = icons[kind];
+        return (
+          <CommandMenuItem
+            key={kind}
+            command={commands[kind].bind({ execute: () => onAdd(kind) })}
+            leftSection={<Icon size={16} />}
+          />
+        );
+      })}
     </>
   );
 }

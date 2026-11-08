@@ -1,3 +1,4 @@
+import { commands } from "./commands";
 import { CurveHandles } from "./CurveHandles";
 import { segmentPath, segmentLength, segmentPoint } from "../document/segments";
 import { formatLength, type PatternDocument } from "../document/schema";
@@ -56,7 +57,14 @@ export function SvgGeometry({
                 x={middle.x}
                 y={middle.y - 10 / scale}
                 fontSize={12 / scale}
-                onClick={() => document.getElementById("line-length")?.focus()}
+                onClick={() =>
+                  commands.editLength
+                    .bind({
+                      execute: () =>
+                        document.getElementById("line-length")?.focus(),
+                    })
+                    .run()
+                }
               >
                 {edge.kind === "cubic"
                   ? `Arc ${formatLength(segmentLength(doc, edge), doc.unitsDisplay)} · Chord ${formatLength(distance(a, b), doc.unitsDisplay)}`

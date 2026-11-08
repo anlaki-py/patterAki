@@ -2,10 +2,9 @@ import { convertToCurve, straightenCurve } from "../document/curves";
 import { addIntersectionPoints } from "../document/intersections";
 import { createId } from "./ids";
 import { useEditor } from "./store";
-export type EdgeAction = "delete" | "reset" | "curve" | "intersections";
 export function executeEdgeActions(
   ids: string[],
-  action: Exclude<EdgeAction, "delete">,
+  action: "reset" | "curve" | "intersections",
 ) {
   const unique = [...new Set(ids)];
   if (!unique.length) return "";

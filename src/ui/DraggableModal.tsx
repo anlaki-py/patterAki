@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Button, Modal } from "@mantine/core";
 import { GripHorizontal } from "lucide-react";
+import { commands } from "../editor/commands";
 import { useDialogDrag } from "./useDialogDrag";
 
 export function DraggableModal({
@@ -16,7 +17,7 @@ export function DraggableModal({
   return (
     <Modal
       opened
-      onClose={onClose}
+      onClose={() => commands.cancelDialog.bind({ execute: onClose }).run()}
       size="sm"
       closeOnClickOutside={false}
       transitionProps={{ duration: 0, transition: "fade" }}

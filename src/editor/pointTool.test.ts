@@ -2,7 +2,7 @@ import { beforeEach, expect, it } from "vitest";
 import { emptyDocument } from "../document/schema";
 import { addPath } from "../document/operations";
 import { useEditor } from "./store";
-import { activateTool, toolCommands } from "./commands";
+import { toolCommands } from "./commands";
 import { findPointInsertion, insertPointAt } from "./pointTool";
 beforeEach(() => {
   let id = 0;
@@ -17,12 +17,12 @@ beforeEach(() => {
       () => String(++id),
     ),
   );
-  activateTool("point");
+  toolCommands.find((command) => command.id === "point")!.run();
 });
 it("exposes Add point with shortcut X", () => {
   expect(toolCommands.find((tool) => tool.id === "point")).toMatchObject({
     label: "Add point",
-    key: "x",
+    shortcut: "X",
   });
 });
 it("projects onto the edge and inserts one undoable vertex", () => {

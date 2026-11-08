@@ -16,6 +16,8 @@ import {
   type AnnotationSession,
 } from "../editor/annotationEdit";
 import { useEditor } from "../editor/store";
+import { commands } from "../editor/commands";
+import { commandProps } from "./CommandControls";
 import { DraggableModal } from "./DraggableModal";
 export function AnnotationDialog({
   session,
@@ -53,6 +55,11 @@ export function AnnotationDialog({
       setCommitError((e as Error).message);
     }
   };
+  const applyCommand = commands.applyMark.bind({
+    execute: apply,
+    enabled: () => !!result.document && annotationSessionActive(session),
+  });
+  const cancelCommand = commands.cancelDialog.bind({ execute: onClose });
   return (
     <DraggableModal
       title={
@@ -65,7 +72,7 @@ export function AnnotationDialog({
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          apply();
+          applyCommand.run();
         }}
       >
         <Stack gap="sm">
@@ -84,7 +91,7 @@ export function AnnotationDialog({
               onKeyDown={(e) => {
                 if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
                   e.preventDefault();
-                  apply();
+                  applyCommand.run();
                 }
               }}
             />
@@ -131,11 +138,11 @@ export function AnnotationDialog({
               : "Enter applies."}
           </Text>
           <Group justify="flex-end">
-            <Button variant="default" onClick={onClose}>
-              Cancel
+            <Button variant="default" {...commandProps(cancelCommand)}>
+              {cancelCommand.label}
             </Button>
-            <Button type="submit" disabled={!result.document}>
-              Apply mark
+            <Button type="submit" disabled={!applyCommand.enabled()}>
+              {applyCommand.label}
             </Button>
           </Group>
         </Stack>
