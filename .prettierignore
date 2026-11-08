@@ -1,0 +1,5 @@
+node_modules
+dist
+package-lock.json
+patternmaking_builder_spec_v2.md
+patternmaking_webapp_tech_stack_and_ui_spec.md
