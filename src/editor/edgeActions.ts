@@ -1,5 +1,6 @@
 import { convertToCurve, straightenCurve } from "../document/curves";
 import { addIntersectionPoints } from "../document/intersections";
+import { assertValidDocumentEdit } from "../document/contourValidation";
 import { createId } from "./ids";
 import { useEditor } from "./store";
 export function executeEdgeActions(
@@ -24,6 +25,7 @@ export function executeEdgeActions(
       ? `Added intersection points with ${result.splitCount} segment splits.`
       : "No new splits needed. Crossings are already connected or none were found.";
   }
+  assertValidDocumentEdit(s.document, next);
   s.commit(next);
   useEditor.setState({ selected: unique });
   return message;

@@ -38,12 +38,14 @@ export function geometrySnaps(
   tolerance: number,
   refs: Vec2[],
   movingPoint?: string,
+  excludedEdges?: ReadonlySet<string>,
 ) {
   const midpoints: Snap[] = [],
     edges: Snap[] = [],
     alignedEdges: Snap[] = [];
   for (const edge of Object.values(doc.segments)) {
     if (edge.from === movingPoint || edge.to === movingPoint) continue;
+    if (excludedEdges?.has(edge.id)) continue;
     const hull = asCubic(doc, edge);
     if (
       point.x < Math.min(...hull.map((p) => p.x)) - tolerance ||
@@ -87,6 +89,8 @@ export function geometrySnaps(
     midpoints,
     edges,
     alignedEdges,
-    intersections: intersectionSnaps(doc, point, tolerance, movingPoint),
+    intersections: intersectionSnaps(doc, point, tolerance, movingPoint).filter(
+      (snap) => !snap.edgeId || !excludedEdges?.has(snap.edgeId),
+    ),
   };
 }

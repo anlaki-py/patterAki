@@ -4,6 +4,11 @@ import { deleteSelection } from "./selectionActions";
 import { useEditor } from "./store";
 import { changeLength } from "../document/operations";
 import {
+  assertValidDocumentEdit,
+  validateDocumentEdit,
+} from "../document/contourValidation";
+import { formatContourIssues } from "../geometry/contourValidation";
+import {
   applyPointPlacement,
   placementOnEdge,
 } from "../document/pointPlacement";
@@ -95,13 +100,16 @@ export const geometryCommands = {
       if (typeof value !== "number")
         throw new Error("Enter a positive length.");
       const s = useEditor.getState();
+      const next = changeLength(
+        s.document,
+        s.selected[0],
+        value * factor,
+        anchor,
+      );
+      const check = validateDocumentEdit(s.document, next);
       useEditor.setState({
-        preview: changeLength(
-          s.document,
-          s.selected[0],
-          value * factor,
-          anchor,
-        ),
+        preview: next,
+        previewIssue: check.valid ? null : formatContourIssues(check),
       });
     },
     singleLine,
@@ -111,9 +119,14 @@ export const geometryCommands = {
     "Apply length",
     () => {
       const s = useEditor.getState();
-      if (s.preview) s.commit(s.preview);
+      if (!s.preview) return;
+      assertValidDocumentEdit(s.document, s.preview);
+      s.commit(s.preview);
     },
-    () => singleLine() && !!useEditor.getState().preview,
+    () =>
+      singleLine() &&
+      !!useEditor.getState().preview &&
+      !useEditor.getState().previewIssue,
     [{ key: "Enter" }],
   ),
   insertPoint: defineCommand<{ value: string | number; factor: number }>(

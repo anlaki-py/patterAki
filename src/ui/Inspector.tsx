@@ -1,4 +1,5 @@
 import { CurveProperties } from "./CurveProperties";
+import { GuideProperties } from "./GuideProperties";
 import {
   Button,
   NumberInput,
@@ -20,6 +21,17 @@ export function Inspector() {
     s.selected.length === 1 ? s.document.annotations[s.selected[0]] : undefined;
   const edge =
     s.selected.length === 1 ? s.document.segments[s.selected[0]] : undefined;
+  const moveCommand = commands.move.bind({
+    execute: () => useEditor.setState({ moveDialogOpen: true }),
+    enabled: () => {
+      const state = useEditor.getState();
+      return (
+        !state.preview &&
+        !state.hasDraft &&
+        (!!state.activePoint || state.selected.length > 0)
+      );
+    },
+  });
   return (
     <Stack p="sm" gap="sm">
       <Text fw={600} size="sm">
@@ -67,6 +79,10 @@ export function Inspector() {
           reshape it. Double-click an edge to insert a point.
         </Text>
       )}
+      <Button variant="default" {...commandProps(moveCommand)}>
+        {moveCommand.label}
+      </Button>
+      <GuideProperties />
       <Text size="xs" c="dimmed">
         Geometry is stored in millimetres. Display units and view zoom do not
         change dimensions.
@@ -102,12 +118,12 @@ export function LengthEditor({
         .run();
       setError("");
     } catch (e) {
-      useEditor.setState({ preview: null });
+      useEditor.setState({ preview: null, previewIssue: null });
       setError((e as Error).message);
     }
   };
   const apply = () => {
-    if (s.preview && !error) {
+    if (s.preview && !s.previewIssue && !error) {
       try {
         commands.applyLength.bind().run();
         onApplied?.();
@@ -158,9 +174,16 @@ export function LengthEditor({
           ? "Keep the midpoint fixed; move both ends equally."
           : `Keep the ${anchor} endpoint fixed; move the other end.`}
       </Text>
+      {s.previewIssue && (
+        <Text size="xs" c="red">
+          {s.previewIssue}
+        </Text>
+      )}
       <Button
         onClick={apply}
-        disabled={!commands.applyLength.bind().enabled() || !!error}
+        disabled={
+          !commands.applyLength.bind().enabled() || !!error || !!s.previewIssue
+        }
       >
         {commands.applyLength.label}
       </Button>

@@ -1,4 +1,9 @@
-export type Shortcut = { key: string; mod?: boolean; shift?: boolean };
+export type Shortcut = {
+  key: string;
+  mod?: boolean;
+  shift?: boolean;
+  alt?: boolean;
+};
 export type BoundCommand = {
   id: string;
   label: string;
@@ -16,8 +21,8 @@ export function defineCommand<Context = void>(
 ) {
   const shortcut = keys
     .map(
-      ({ key, mod, shift }) =>
-        `${mod ? "Ctrl/Cmd+" : ""}${shift ? "Shift+" : ""}${key === " " ? "Space" : key.length === 1 ? key.toUpperCase() : key}`,
+      ({ key, mod, shift, alt }) =>
+        `${mod ? "Ctrl/Cmd+" : ""}${shift ? "Shift+" : ""}${alt ? "Alt+" : ""}${key === " " ? "Space" : key.length === 1 ? key.toUpperCase() : key}`,
     )
     .join(" / ");
   return {
@@ -66,6 +71,19 @@ export function isEditingText(target: EventTarget | null) {
     )
   );
 }
+/** Tab may cycle snap choices only while a real placement preview is active. */
+export function tabCyclesTarget(
+  event: Pick<KeyboardEvent, "key" | "target">,
+  candidates: number,
+  previewActive: boolean,
+) {
+  return (
+    event.key === "Tab" &&
+    candidates > 1 &&
+    previewActive &&
+    !isEditingText(event.target)
+  );
+}
 export function dispatchShortcut(
   event: Pick<
     KeyboardEvent,
@@ -84,7 +102,6 @@ export function dispatchShortcut(
   if (
     event.defaultPrevented ||
     event.isComposing ||
-    event.altKey ||
     isEditingText(event.target)
   )
     return false;
@@ -93,7 +110,8 @@ export function dispatchShortcut(
       (key) =>
         key.key.toLowerCase() === event.key.toLowerCase() &&
         !!key.mod === (event.ctrlKey || event.metaKey) &&
-        !!key.shift === event.shiftKey,
+        !!key.shift === event.shiftKey &&
+        !!key.alt === event.altKey,
     ),
   );
   if (!command) return false;

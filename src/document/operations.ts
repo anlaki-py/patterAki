@@ -9,6 +9,10 @@ import {
   type Vec2,
 } from "../geometry/line";
 import type { PatternDocument } from "./schema";
+import {
+  formatContourIssues,
+  validateClosedPositions,
+} from "../geometry/contourValidation";
 type IdFactory = () => string;
 export function addPath(
   doc: PatternDocument,
@@ -17,6 +21,10 @@ export function addPath(
   id: IdFactory,
 ): PatternDocument {
   if (positions.length < 2) throw new Error("A path needs two points.");
+  if (closed) {
+    const check = validateClosedPositions(positions);
+    if (!check.valid) throw new Error(formatContourIssues(check));
+  }
   const next = structuredClone(doc);
   const ids = positions.map((p) => {
     const existing = Object.keys(next.points).find(

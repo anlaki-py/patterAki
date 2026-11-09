@@ -5,6 +5,11 @@ import {
   emptyDocument,
   type PatternDocument,
 } from "../document/schema";
+import {
+  defaultSettings,
+  type EditorSettings,
+  type SnapModes,
+} from "./settings";
 export type Tool =
   "select" | "line" | "polyline" | "rectangle" | "curve" | "point" | "pan";
 type State = {
@@ -13,19 +18,37 @@ type State = {
   future: PatternDocument[];
   revision: number;
   selected: string[];
+  selectedGuide: string | null;
+  activePoint: string | null;
   tool: Tool;
   snap: boolean;
   grid: boolean;
+  gridSnap: boolean;
+  gridSpacingMm: number;
+  gridMajorEvery: number;
+  snapModes: SnapModes;
+  mouseRadiusPx: number;
+  touchRadiusPx: number;
+  releaseMultiplier: number;
+  showRulers: boolean;
+  showGuides: boolean;
+  snapGuides: boolean;
+  nudgeMm: number;
   ready: boolean;
   hasDraft: boolean;
+  moveDialogOpen: boolean;
+  /** True while a pointer gesture owns the canvas; keyboard nudges must wait. */
+  gestureActive: boolean;
   saveStatus: string;
   preview: PatternDocument | null;
+  previewIssue: string | null;
   cancelVersion: number;
   commit: (doc: PatternDocument) => void;
   undo: () => void;
   redo: () => void;
   load: (doc: PatternDocument) => void;
   cancel: () => void;
+  applySettings: (settings: EditorSettings) => void;
 };
 export const useEditor = create<State>((set, get) => ({
   document: emptyDocument(createId()),
@@ -33,19 +56,23 @@ export const useEditor = create<State>((set, get) => ({
   future: [],
   revision: 0,
   selected: [],
+  selectedGuide: null,
+  activePoint: null,
   tool: "select",
-  snap: true,
-  grid: true,
+  ...defaultSettings,
   ready: false,
   hasDraft: false,
+  moveDialogOpen: false,
+  gestureActive: false,
   saveStatus: "Opening…",
   preview: null,
+  previewIssue: null,
   cancelVersion: 0,
   commit: (doc) => {
     documentSchema.parse(doc);
     const s = get();
     if (JSON.stringify(doc) === JSON.stringify(s.document)) {
-      set({ preview: null });
+      set({ preview: null, previewIssue: null });
       return;
     }
     set({
@@ -53,10 +80,15 @@ export const useEditor = create<State>((set, get) => ({
       selected: s.selected.filter(
         (id) => !!doc.segments[id] || !!doc.annotations[id],
       ),
+      selectedGuide:
+        s.selectedGuide && doc.guides[s.selectedGuide] ? s.selectedGuide : null,
+      activePoint:
+        s.activePoint && doc.points[s.activePoint] ? s.activePoint : null,
       past: [...s.past.slice(-99), s.document],
       future: [],
       revision: s.revision + 1,
       preview: null,
+      previewIssue: null,
       saveStatus: "Unsaved",
     });
   },
@@ -73,7 +105,10 @@ export const useEditor = create<State>((set, get) => ({
         past: s.past.slice(0, -1),
         future: [s.document, ...s.future],
         selected: [],
+        selectedGuide: null,
+        activePoint: null,
         revision: s.revision + 1,
+        previewIssue: null,
         saveStatus: "Unsaved",
       });
   },
@@ -90,7 +125,10 @@ export const useEditor = create<State>((set, get) => ({
         past: [...s.past, s.document],
         future: s.future.slice(1),
         selected: [],
+        selectedGuide: null,
+        activePoint: null,
         revision: s.revision + 1,
+        previewIssue: null,
         saveStatus: "Unsaved",
       });
   },
@@ -101,8 +139,13 @@ export const useEditor = create<State>((set, get) => ({
       past: [],
       future: [],
       selected: [],
+      selectedGuide: null,
+      activePoint: null,
       preview: null,
+      previewIssue: null,
       hasDraft: false,
+      moveDialogOpen: false,
+      gestureActive: false,
       revision: s.revision + 1,
       cancelVersion: s.cancelVersion + 1,
       saveStatus: "Unsaved",
@@ -111,7 +154,11 @@ export const useEditor = create<State>((set, get) => ({
   cancel: () =>
     set((s) => ({
       preview: null,
+      previewIssue: null,
       hasDraft: false,
+      moveDialogOpen: false,
+      gestureActive: false,
       cancelVersion: s.cancelVersion + 1,
     })),
+  applySettings: (settings) => set({ ...settings }),
 }));

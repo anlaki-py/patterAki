@@ -7,6 +7,132 @@ export type Snap = {
   edgeId?: string;
   t?: number;
 };
+export type SnapKind =
+  | "endpoint"
+  | "intersection"
+  | "guide-intersection"
+  | "midpoint"
+  | "perpendicular"
+  | "on-edge"
+  | "guide"
+  | "angle"
+  | "alignment"
+  | "grid";
+export type SnapCandidate = Snap & {
+  kind: SnapKind;
+  targetId: string;
+  priority: number;
+  selectable?: boolean;
+};
+export type SnapLock = {
+  targetId: string;
+  point: Vec2;
+  kind: SnapKind;
+};
+export const snapPriority: Record<SnapKind, number> = {
+  endpoint: 1,
+  intersection: 2,
+  "guide-intersection": 3,
+  midpoint: 4,
+  perpendicular: 5,
+  "on-edge": 7,
+  guide: 7,
+  angle: 8.5,
+  alignment: 8,
+  grid: 9,
+};
+export const alignedEdgePriority = 6;
+const finite = (p: Vec2) => Number.isFinite(p.x) && Number.isFinite(p.y);
+function compareCandidates(pointer: Vec2, a: SnapCandidate, b: SnapCandidate) {
+  if (a.priority !== b.priority) return a.priority - b.priority;
+  const byDistance = distance(pointer, a.point) - distance(pointer, b.point);
+  if (byDistance !== 0) return byDistance;
+  if (a.targetId !== b.targetId) return a.targetId < b.targetId ? -1 : 1;
+  const byT = (a.t ?? 0) - (b.t ?? 0);
+  if (byT !== 0) return byT;
+  const byX = a.point.x - b.point.x;
+  return byX !== 0 ? byX : a.point.y - b.point.y;
+}
+export function sortSnapCandidates(pointer: Vec2, candidates: SnapCandidate[]) {
+  return [...candidates].sort((a, b) => compareCandidates(pointer, a, b));
+}
+export function resolveSnapCandidates(
+  pointer: Vec2,
+  candidates: SnapCandidate[],
+  options: {
+    tolerance: number;
+    previousLock?: SnapLock | null;
+    cycleOffset?: number;
+    releaseMultiplier?: number;
+  },
+): {
+  chosen?: SnapCandidate;
+  choices: SnapCandidate[];
+  choiceIndex: number;
+  lock: SnapLock | null;
+} {
+  const tolerance = options.tolerance;
+  if (!finite(pointer) || !Number.isFinite(tolerance) || tolerance <= 0)
+    return { choices: [], choiceIndex: 0, lock: null };
+  const finiteCandidates = candidates.filter(
+    (candidate) =>
+      finite(candidate.point) && Number.isFinite(candidate.priority),
+  );
+  const eligible = finiteCandidates.filter(
+    (candidate) => distance(pointer, candidate.point) <= tolerance,
+  );
+  const sorted = sortSnapCandidates(pointer, eligible);
+  const best = sorted[0];
+  const release = tolerance * Math.max(1, options.releaseMultiplier ?? 1.5);
+  let held: SnapCandidate | undefined;
+  if (options.previousLock) {
+    // Hysteresis keeps the chosen target between acquisition radius and the
+    // release radius even though no new target could be acquired there.
+    held = finiteCandidates.find(
+      (candidate) => candidate.targetId === options.previousLock!.targetId,
+    );
+    if (held && distance(pointer, held.point) > release) held = undefined;
+    // An exact topology target can replace a held weak candidate when the raw
+    // pointer lands within a small inner radius. Without this exception a held
+    // grid/alignment target could make a nearby endpoint unreachable.
+    if (
+      held &&
+      best &&
+      best.priority <= 2 &&
+      best.priority < held.priority &&
+      distance(pointer, best.point) <= tolerance * 0.4
+    )
+      held = best;
+  }
+  const base = held ?? best;
+  if (!base) return { choices: [], choiceIndex: 0, lock: null };
+  const choices = sorted.filter(
+    (candidate) => candidate.priority === base.priority,
+  );
+  if (!choices.some((candidate) => candidate.targetId === base.targetId))
+    choices.unshift(base);
+  const baseIndex = Math.max(
+    0,
+    choices.findIndex((candidate) => candidate.targetId === base.targetId),
+  );
+  const offset = options.cycleOffset ?? 0;
+  const choiceIndex =
+    choices.length > 0
+      ? (((baseIndex + offset) % choices.length) + choices.length) %
+        choices.length
+      : 0;
+  const chosen = choices[choiceIndex] ?? base;
+  return {
+    chosen,
+    choices,
+    choiceIndex,
+    lock: {
+      targetId: chosen.targetId,
+      point: chosen.point,
+      kind: chosen.kind,
+    },
+  };
+}
 export function alignmentReferences(
   point: Vec2,
   refs: Vec2[],

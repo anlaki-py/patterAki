@@ -1,8 +1,10 @@
 import { useEffect, useRef } from "react";
 import { notifications } from "@mantine/notifications";
 import { bendCurve, convertToCurve, moveHandle } from "../document/curves";
+import { validateDocumentEdit } from "../document/contourValidation";
 import { segmentProjection } from "../document/segments";
 import type { PatternDocument } from "../document/schema";
+import { formatContourIssues } from "../geometry/contourValidation";
 import type { Vec2 } from "../geometry/line";
 import { useEditor } from "./store";
 type CurveDrag = {
@@ -39,6 +41,7 @@ export function useCurveDrag() {
     useEditor.setState({
       selected: [edgeId],
       preview: convertToCurve(s.document, edgeId),
+      previewIssue: null,
     });
     return true;
   };
@@ -51,7 +54,11 @@ export function useCurveDrag() {
           x: point.x - d.start.x,
           y: point.y - d.start.y,
         });
-    useEditor.setState({ preview });
+    const check = validateDocumentEdit(d.base, preview);
+    useEditor.setState({
+      preview,
+      previewIssue: check.valid ? null : formatContourIssues(check),
+    });
     return true;
   };
   const finish = (pointer: number) => {
@@ -59,6 +66,15 @@ export function useCurveDrag() {
     if (!d || d.pointer !== pointer) return;
     drag.current = null;
     const s = useEditor.getState();
+    if (s.previewIssue) {
+      const message = s.previewIssue;
+      s.cancel();
+      notifications.show({
+        color: "red",
+        message: `Curve edit cancelled. ${message}`,
+      });
+      return;
+    }
     try {
       if (s.preview) s.commit(s.preview);
     } catch {

@@ -4,9 +4,11 @@ import {
   commands,
   dispatchShortcut,
   editCommands,
+  nudgeCommands,
   toolCommands,
 } from "./commands";
 import { bindDraftCommands } from "./draftCommands";
+import { tabCyclesTarget } from "./command";
 import { commandProps } from "../ui/CommandControls";
 import { useEditor } from "./store";
 import { addPath } from "../document/operations";
@@ -323,4 +325,166 @@ it("batch edge commands retain selections and commit only one edit", () => {
   commands.undo.bind().run();
   commands.undo.bind().run();
   expect(useEditor.getState().document).toEqual(doc);
+});
+
+it("E01 commits a typed 125 mm line exactly despite a nearby 120 mm grid target", () => {
+  useEditor.getState().load({ ...emptyDocument("exact"), unitsDisplay: "mm" });
+  useEditor.setState({
+    tool: "line",
+    snap: true,
+    gridSnap: true,
+    gridSpacingMm: 10,
+  });
+  const commitPath = (points: { x: number; y: number }[], closed = false) => {
+    const s = useEditor.getState();
+    s.commit(addPath(s.document, points, closed, id));
+  };
+  const actions = bindDraftCommands({
+    draft: [{ x: 0, y: 0 }],
+    exact: 125,
+    degrees: 0,
+    width: 18,
+    height: 24,
+    factor: 1,
+    commitPath,
+    setDraft: vi.fn(),
+    clearExact: vi.fn(),
+  });
+  actions.exactLine.run();
+  const doc = useEditor.getState().document;
+  const edge = Object.values(doc.segments)[0];
+  expect(segmentLength(doc, edge)).toBe(125);
+  const points = Object.values(doc.points);
+  expect(points).toContainEqual({ x: 125, y: 0 });
+
+  useEditor.getState().load({ ...emptyDocument("angle"), unitsDisplay: "mm" });
+  const angled = bindDraftCommands({
+    draft: [{ x: 0, y: 0 }],
+    exact: 125,
+    degrees: 30,
+    width: 18,
+    height: 24,
+    factor: 1,
+    commitPath,
+    setDraft: vi.fn(),
+    clearExact: vi.fn(),
+  });
+  angled.exactLine.run();
+  const angledDoc = useEditor.getState().document;
+  const angledEdge = Object.values(angledDoc.segments)[0];
+  const from = angledDoc.points[angledEdge.from];
+  const to = angledDoc.points[angledEdge.to];
+  expect(segmentLength(angledDoc, angledEdge)).toBeCloseTo(125, 12);
+  expect(
+    (Math.atan2(to.y - from.y, to.x - from.x) * 180) / Math.PI,
+  ).toBeCloseTo(30, 12);
+});
+
+it("E02 creates an exact-size rectangle without magnetic rounding", () => {
+  useEditor.getState().load(emptyDocument("rectangle"));
+  useEditor.setState({
+    tool: "rectangle",
+    snap: true,
+    gridSnap: true,
+    gridSpacingMm: 10,
+  });
+  const commitPath = (points: { x: number; y: number }[], closed = false) => {
+    const s = useEditor.getState();
+    s.commit(addPath(s.document, points, closed, id));
+  };
+  const actions = bindDraftCommands({
+    draft: [{ x: 5, y: 5 }],
+    exact: 12,
+    degrees: 0,
+    width: 18,
+    height: 24,
+    factor: 10,
+    commitPath,
+    setDraft: vi.fn(),
+    clearExact: vi.fn(),
+  });
+  actions.rectangle.run();
+  expect(Object.values(useEditor.getState().document.points)).toEqual(
+    expect.arrayContaining([
+      { x: 5, y: 5 },
+      { x: 185, y: 5 },
+      { x: 185, y: 245 },
+      { x: 5, y: 245 },
+    ]),
+  );
+});
+
+it("M07 nudges by 1/10/0.1 mm with one history entry per keypress", () => {
+  useEditor.getState().load(
+    addPath(
+      emptyDocument("nudge"),
+      [
+        { x: 0, y: 0 },
+        { x: 100, y: 0 },
+      ],
+      false,
+      id,
+    ),
+  );
+  const document = useEditor.getState().document;
+  const pointId = Object.keys(document.points)[1];
+  useEditor.setState({
+    tool: "select",
+    selected: [],
+    activePoint: pointId,
+    gestureActive: false,
+  });
+  dispatchShortcut(keyEvent("ArrowRight"), nudgeCommands);
+  expect(useEditor.getState().document.points[pointId]).toEqual({
+    x: 101,
+    y: 0,
+  });
+  expect(useEditor.getState().past).toHaveLength(1);
+  dispatchShortcut(keyEvent("ArrowUp", { shiftKey: true }), nudgeCommands);
+  expect(useEditor.getState().document.points[pointId]).toEqual({
+    x: 101,
+    y: -10,
+  });
+  dispatchShortcut(keyEvent("ArrowLeft", { altKey: true }), nudgeCommands);
+  expect(useEditor.getState().document.points[pointId].x).toBeCloseTo(
+    100.9,
+    12,
+  );
+  expect(useEditor.getState().past).toHaveLength(3);
+  useEditor.getState().undo();
+  useEditor.getState().undo();
+  useEditor.getState().undo();
+  expect(useEditor.getState().document).toEqual(document);
+});
+
+it("S08 leaves Tab focus traversal alone in a field and blocks nudges", () => {
+  class FocusedControl {
+    closest() {
+      return this;
+    }
+  }
+  expect(tabCyclesTarget({ key: "Tab", target: null }, 2, true)).toBe(true);
+  expect(tabCyclesTarget({ key: "Tab", target: null }, 1, true)).toBe(false);
+  expect(tabCyclesTarget({ key: "Tab", target: null }, 2, false)).toBe(false);
+  expect(tabCyclesTarget({ key: "ArrowRight", target: null }, 2, true)).toBe(
+    false,
+  );
+  vi.stubGlobal("Element", FocusedControl);
+  const target = new FocusedControl() as unknown as EventTarget;
+  expect(tabCyclesTarget({ key: "Tab", target }, 2, true)).toBe(false);
+
+  const document = useEditor.getState().document;
+  const pointId = Object.keys(document.points)[0];
+  useEditor.setState({
+    activePoint: pointId,
+    selected: [],
+    gestureActive: false,
+  });
+  expect(
+    dispatchShortcut(keyEvent("ArrowRight", { target }), nudgeCommands),
+  ).toBe(false);
+  expect(useEditor.getState().document).toBe(document);
+  useEditor.setState({ gestureActive: true });
+  dispatchShortcut(keyEvent("ArrowRight"), nudgeCommands);
+  expect(useEditor.getState().document).toBe(document);
 });

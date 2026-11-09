@@ -1,5 +1,11 @@
+import { settingsFromState } from "../editor/settings";
 import { useEditor } from "../editor/store";
-import { latestProject, saveProject } from "./projects";
+import {
+  latestProject,
+  loadEditorSettings,
+  saveEditorSettings,
+  saveProject,
+} from "./projects";
 export async function saveNow(): Promise<boolean> {
   const { document, revision, ready } = useEditor.getState();
   if (!ready) return false;
@@ -18,7 +24,10 @@ export async function saveNow(): Promise<boolean> {
 }
 export function startPersistence() {
   let timer: ReturnType<typeof setTimeout>;
+  let settingsTimer: ReturnType<typeof setTimeout>;
   let disposed = false;
+  let settingsReady = false;
+  let lastSettings = "";
   void latestProject()
     .then((doc) => {
       if (disposed) return;
@@ -36,11 +45,30 @@ export function startPersistence() {
             "Could not open local storage. Export JSON to keep a backup.",
         });
     });
+  void loadEditorSettings()
+    .then((settings) => {
+      if (disposed) return;
+      useEditor.getState().applySettings(settings);
+      lastSettings = JSON.stringify(settings);
+      settingsReady = true;
+    })
+    .catch(() => {
+      settingsReady = true;
+    });
   const unsubscribe = useEditor.subscribe((state, previous) => {
     if (state.ready && state.revision !== previous.revision) {
       clearTimeout(timer);
       timer = setTimeout(() => void saveNow(), 500);
     }
+    if (!settingsReady) return;
+    const next = settingsFromState(state),
+      serialized = JSON.stringify(next);
+    if (serialized === lastSettings) return;
+    lastSettings = serialized;
+    clearTimeout(settingsTimer);
+    settingsTimer = setTimeout(() => {
+      void saveEditorSettings(next).catch(() => undefined);
+    }, 300);
   });
   const beforeUnload = (event: BeforeUnloadEvent) => {
     const s = useEditor.getState();
@@ -51,6 +79,7 @@ export function startPersistence() {
   return () => {
     disposed = true;
     clearTimeout(timer);
+    clearTimeout(settingsTimer);
     unsubscribe();
     window.removeEventListener("beforeunload", beforeUnload);
   };

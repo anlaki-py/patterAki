@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { annotationInRange } from "./annotationGeometry";
 import { annotationSchema } from "./annotationSchema";
+import { constructionGuideSchema } from "./guideSchema";
 const coordinate = z.number().finite().min(-1e7).max(1e7);
 const point = z.object({ x: coordinate, y: coordinate }).strict();
 const lineSegment = z
@@ -58,7 +59,7 @@ const version1Schema = z
     segments: z.record(z.string(), lineSegment),
   })
   .strict();
-const currentSchema = z
+const version3Schema = z
   .object({
     ...version2Base.shape,
     schemaVersion: z.literal(3),
@@ -79,12 +80,45 @@ const currentSchema = z
         });
     }
   });
+const currentSchema = z
+  .object({
+    ...version2Base.shape,
+    schemaVersion: z.literal(4),
+    annotations: z.record(z.string(), annotationSchema),
+    guides: z.record(z.string(), constructionGuideSchema),
+  })
+  .strict()
+  .superRefine(validateSegments)
+  .superRefine((doc, ctx) => {
+    for (const [id, mark] of Object.entries(doc.annotations)) {
+      if (
+        id !== mark.id ||
+        Object.hasOwn(doc.segments, id) ||
+        !annotationInRange(mark)
+      )
+        ctx.addIssue({
+          code: "custom",
+          message: `Invalid or duplicate annotation ID ${id}`,
+        });
+    }
+    for (const [id, guide] of Object.entries(doc.guides)) {
+      if (
+        id !== guide.id ||
+        Object.hasOwn(doc.segments, id) ||
+        Object.hasOwn(doc.annotations, id)
+      )
+        ctx.addIssue({
+          code: "custom",
+          message: `Invalid or duplicate guide ID ${id}`,
+        });
+    }
+  });
 // Validate each historical format before adding fields; malformed or unknown
 // versions must never lose data by being relabelled as the current format.
 export const documentSchema = z.preprocess((input) => {
   if (!input || typeof input !== "object" || !("schemaVersion" in input))
     return input;
-  let candidate = input;
+  let candidate = input as Record<string, unknown>;
   if (candidate.schemaVersion === 1) {
     const legacy = version1Schema.safeParse(candidate);
     if (!legacy.success) return input;
@@ -93,14 +127,20 @@ export const documentSchema = z.preprocess((input) => {
   if (candidate.schemaVersion === 2) {
     const legacy = version2Schema.safeParse(candidate);
     if (!legacy.success) return input;
-    return { ...legacy.data, schemaVersion: 3, annotations: {} };
+    candidate = { ...legacy.data, schemaVersion: 3, annotations: {} };
+  }
+  if (candidate.schemaVersion === 3) {
+    const legacy = version3Schema.safeParse(candidate);
+    if (!legacy.success) return input;
+    return { ...legacy.data, schemaVersion: 4, guides: {} };
   }
   return candidate;
 }, currentSchema);
 export type PatternDocument = z.infer<typeof documentSchema>;
 export const emptyDocument = (id: string): PatternDocument => ({
-  schemaVersion: 3,
+  schemaVersion: 4,
   annotations: {},
+  guides: {},
   id,
   name: "Untitled pattern",
   points: {},

@@ -159,7 +159,7 @@ describe("version migrations", () => {
   );
   it("rejects corrupt legacy geometry, unknown versions and unexpected mark data instead of dropping it", () => {
     const doc = fixture();
-    expect(documentSchema.safeParse({ ...doc, schemaVersion: 4 }).success).toBe(
+    expect(documentSchema.safeParse({ ...doc, schemaVersion: 5 }).success).toBe(
       false,
     );
     // Even an empty extra field is unsupported in historical formats.

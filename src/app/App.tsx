@@ -34,11 +34,13 @@ import {
   commands,
   dispatchShortcut,
   editCommands,
+  nudgeCommands,
   toolCommands,
 } from "../editor/commands";
 import { EditorViewport } from "../editor/EditorViewport";
 import { CommandMenuItem, commandProps } from "../ui/CommandControls";
 import { Inspector } from "../ui/Inspector";
+import { SnapSettings } from "../ui/SnapSettings";
 import { emptyDocument, parseProject } from "../document/schema";
 import { saveNow, startPersistence } from "../persistence/autosave";
 const icons = {
@@ -161,6 +163,7 @@ export function App() {
         dispatchShortcut(event, [
           ...toolCommands,
           ...editCommands,
+          ...nudgeCommands,
           ...fileCommands,
         ]);
     };
@@ -258,6 +261,7 @@ export function App() {
           checked={s.snap}
           onChange={() => commands.snap.bind().run()}
         />
+        <SnapSettings />
         <ActionIcon
           variant="default"
           aria-label="Toggle color scheme"
@@ -350,7 +354,7 @@ export function App() {
               color: "red",
               title: "Import failed",
               message:
-                "Choose a valid version 1, 2 or 3 PatternAki JSON project under 10 MB. Your current pattern is unchanged.",
+                "Choose a valid version 1, 2, 3 or 4 PatternAki JSON project under 10 MB. Your current pattern is unchanged.",
             });
           }
         }}

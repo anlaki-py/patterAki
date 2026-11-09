@@ -216,3 +216,148 @@ body,
 .tool-select .annotation {
   cursor: move;
 }
+
+/* Screen-space ruler and guide overlays. The drawing transform never changes
+   when these are shown or hidden. */
+.canvas-area {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+.canvas-area > .drafting-surface {
+  flex: 1;
+  min-width: 0;
+}
+.ruler-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+.ruler {
+  position: absolute;
+  pointer-events: auto;
+  touch-action: none;
+  background: color-mix(in srgb, var(--draft-background) 88%, transparent);
+  color: var(--draft-line);
+}
+.ruler-top {
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--ruler-size);
+  cursor: ns-resize;
+  border-bottom: 1px solid var(--draft-grid);
+}
+.ruler-left {
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: var(--ruler-size);
+  cursor: ew-resize;
+  border-right: 1px solid var(--draft-grid);
+}
+.ruler-svg {
+  display: block;
+  overflow: hidden;
+}
+.ruler-tick {
+  stroke: var(--draft-line);
+  stroke-width: 0.5;
+  opacity: 0.55;
+}
+.ruler-tick.major {
+  stroke-width: 1;
+  opacity: 0.9;
+}
+.ruler-label {
+  fill: var(--draft-line);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+}
+.ruler-corner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--ruler-size);
+  height: var(--ruler-size);
+  background: var(--draft-background);
+  border-right: 1px solid var(--draft-grid);
+  border-bottom: 1px solid var(--draft-grid);
+  pointer-events: auto;
+}
+
+/* Vertical/horizontal previews in ruler space are divs; the same class on an
+   SVG guide line uses the stroke rule below. */
+.guide-preview-line {
+  position: absolute;
+  z-index: 6;
+  pointer-events: none;
+  background: var(--draft-selection);
+  opacity: 0.75;
+}
+.guide-preview-line.vertical {
+  top: 0;
+  bottom: 0;
+  width: 1px;
+}
+.guide-preview-line.horizontal {
+  left: 0;
+  right: 0;
+  height: 1px;
+}
+svg .guide-preview-line {
+  position: static;
+  background: none;
+  stroke: var(--draft-selection);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+}
+.construction-guide {
+  stroke: color-mix(in srgb, var(--draft-selection) 55%, transparent);
+  stroke-width: 1;
+}
+.construction-guide.selected {
+  stroke: var(--draft-selection);
+  stroke-width: 2;
+}
+.construction-guide.locked {
+  stroke-dasharray: 2 5;
+}
+.guide-mode-badge {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  z-index: 7;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--draft-selection);
+  color: white;
+  font-size: 12px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.grid-minor {
+  opacity: 0.3;
+}
+.grid-major {
+  opacity: 0.7;
+}
+.snap-grid-marker line {
+  stroke: var(--draft-selection);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+.invalid-preview {
+  opacity: 0.75;
+}
+.invalid-preview .edge-stroke,
+.invalid-preview .selected .edge-stroke {
+  stroke: var(--mantine-color-red-6);
+}
+.invalid-measurement {
+  fill: var(--mantine-color-red-6);
+}
