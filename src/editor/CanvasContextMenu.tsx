@@ -18,6 +18,7 @@ import { commands } from "./commands";
 import type { BoundCommand } from "./command";
 import { CommandMenuItem, notifyCommand } from "../ui/CommandControls";
 import { contextSelection } from "./selection";
+import { expandPieceSelection } from "../document/pieces";
 import { contextTarget, type ContextHit } from "./contextTarget";
 import { useEditor } from "./store";
 type Target = ContextHit & {
@@ -65,8 +66,15 @@ export function CanvasContextMenu({
   );
   const activate = (hit: ContextHit, point: Vec2): Target => {
     s.cancel();
-    if (hit.kind !== "empty")
-      useEditor.setState({ selected: contextSelection(s.selected, hit.id) });
+    if (hit.kind !== "empty") {
+      const nextSelection = contextSelection(s.selected, hit.id);
+      useEditor.setState({
+        selected:
+          hit.kind === "edge"
+            ? expandPieceSelection(s.document, nextSelection)
+            : nextSelection,
+      });
+    }
     const state = useEditor.getState();
     const next = {
       ...hit,
@@ -108,6 +116,7 @@ export function CanvasContextMenu({
       },
     }),
     intersections: report(commands.intersections.bind()),
+    piece: report(commands.createPiece.bind(target.id)),
     curve: report(commands.curve.bind()),
     reset: report(commands.reset.bind()),
     delete: report(commands.delete.bind()),
@@ -192,6 +201,9 @@ export function CanvasContextMenu({
               actions={edgeCommands(target)}
             />
           )}
+          {edge && target?.kind === "edge" && (
+            <CommandMenuItem command={edgeCommands(target).piece} />
+          )}
           {target?.kind === "annotation" && (
             <>
               <Menu.Label>Pattern mark</Menu.Label>
@@ -226,17 +238,22 @@ export function CanvasContextMenu({
           </Menu.Target>
           <Menu.Dropdown>
             {selectedEdge && (
-              <EdgeMenuItems
-                curved={curved}
-                count={s.selected.length}
-                actions={edgeCommands({
-                  kind: "edge",
-                  id: selectedEdge.id,
-                  point: segmentPoint(s.document, selectedEdge, 0.5),
-                  revision: s.revision,
-                  cancelVersion: s.cancelVersion,
-                })}
-              />
+              <>
+                <EdgeMenuItems
+                  curved={curved}
+                  count={s.selected.length}
+                  actions={edgeCommands({
+                    kind: "edge",
+                    id: selectedEdge.id,
+                    point: segmentPoint(s.document, selectedEdge, 0.5),
+                    revision: s.revision,
+                    cancelVersion: s.cancelVersion,
+                  })}
+                />
+                <CommandMenuItem
+                  command={commands.createPiece.bind(selectedEdge.id)}
+                />
+              </>
             )}
           </Menu.Dropdown>
         </Menu>

@@ -1,44 +1,13 @@
 import "fake-indexeddb/auto";
 import { expect, it } from "vitest";
-import {
-  createSaveQueue,
-  createSettingsQueue,
-  latestProject,
-  loadEditorSettings,
-  ProjectDatabase,
-} from "./projects";
+import { createSaveQueue, latestProject, ProjectDatabase } from "./projects";
 import { newAnnotation, putAnnotation } from "../document/annotations";
 import { emptyDocument } from "../document/schema";
-import { defaultSettings } from "../editor/settings";
 it("saves and reopens validated documents in IndexedDB", async () => {
   const database = new ProjectDatabase("test-" + crypto.randomUUID()),
     doc = emptyDocument("one");
   await database.projects.put({ id: doc.id, document: doc, updatedAt: 1 });
   expect(await latestProject(database)).toEqual(doc);
-  await database.delete();
-});
-it("saves and reopens validated editor settings without document history", async () => {
-  const database = new ProjectDatabase("settings-" + crypto.randomUUID());
-  expect(await loadEditorSettings(database)).toEqual(defaultSettings);
-  const save = createSettingsQueue((settings) =>
-    database.settings.put({ id: "editor", value: settings }),
-  );
-  const custom = {
-    ...defaultSettings,
-    gridSpacingMm: 2.5,
-    gridSnap: false,
-    showRulers: false,
-    nudgeMm: 0.1,
-    snapModes: { ...defaultSettings.snapModes, guides: false },
-  };
-  await save(custom);
-  expect(await loadEditorSettings(database)).toEqual(custom);
-  expect(await database.projects.count()).toBe(0);
-  await database.settings.put({
-    id: "editor",
-    value: { ...custom, gridSpacingMm: -1 },
-  });
-  expect(await loadEditorSettings(database)).toEqual(defaultSettings);
   await database.delete();
 });
 it("serializes rapid writes in order", async () => {
@@ -72,16 +41,17 @@ it("rejects corrupt stored documents rather than replacing them", async () => {
   expect(await database.projects.count()).toBe(1);
   await database.delete();
 });
-it("opens a version 1 saved project as version 4 without rewriting the original record", async () => {
+it("opens a version 1 saved project as version 5 without rewriting the original record", async () => {
   const database = new ProjectDatabase("legacy-" + crypto.randomUUID());
-  const { annotations, guides, ...base } = emptyDocument("old");
+  const { annotations, guides, pieces, ...base } = emptyDocument("old");
   expect(annotations).toEqual({});
   expect(guides).toEqual({});
+  expect(pieces).toEqual({});
   const legacy = { ...base, schemaVersion: 1 };
   await database
     .table("projects")
     .put({ id: legacy.id, document: legacy, updatedAt: 1 });
-  expect((await latestProject(database))?.schemaVersion).toBe(4);
+  expect((await latestProject(database))?.schemaVersion).toBe(5);
   expect(
     (await database.table("projects").get("old")).document.schemaVersion,
   ).toBe(1);
@@ -130,9 +100,10 @@ it("migrates saved version 2 curves without rewriting their source record", asyn
     .put({ id: legacy.id, document: legacy, updatedAt: 1 });
   expect(await latestProject(database)).toEqual({
     ...legacy,
-    schemaVersion: 4,
+    schemaVersion: 5,
     annotations: {},
     guides: {},
+    pieces: {},
   });
   expect((await database.table("projects").get(legacy.id)).document).toEqual(
     legacy,

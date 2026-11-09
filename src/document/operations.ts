@@ -9,6 +9,7 @@ import {
   type Vec2,
 } from "../geometry/line";
 import type { PatternDocument } from "./schema";
+import { withoutBrokenPieces } from "./pieces";
 import {
   formatContourIssues,
   validateClosedPositions,
@@ -114,11 +115,11 @@ export function deleteSegments(
   const used = new Set(
     Object.values(segments).flatMap((edge) => [edge.from, edge.to]),
   );
-  return {
+  return withoutBrokenPieces({
     ...doc,
     segments,
     points: Object.fromEntries(
       Object.entries(doc.points).filter(([key]) => used.has(key)),
     ),
-  };
+  });
 }

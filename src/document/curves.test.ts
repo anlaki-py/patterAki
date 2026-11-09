@@ -98,9 +98,12 @@ it("round-trips curves and safely migrates version 1 lines", () => {
   const { doc, edge } = fixture(),
     curved = bendCurve(doc, edge.id, 0.5, { x: 0, y: 40 });
   expect(parseProject(JSON.stringify(curved))).toEqual(curved);
-  const { annotations: _annotations, guides: _guides, ...legacy } = doc;
-  expect(_annotations).toEqual({});
-  expect(_guides).toEqual({});
+  const { annotations, guides, pieces, ...legacy } = doc;
+  expect({ annotations, guides, pieces }).toEqual({
+    annotations: {},
+    guides: {},
+    pieces: {},
+  });
   expect(parseProject(JSON.stringify({ ...legacy, schemaVersion: 1 }))).toEqual(
     doc,
   );

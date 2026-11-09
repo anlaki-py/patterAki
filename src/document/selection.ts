@@ -2,6 +2,7 @@ import { annotationTouchesBox } from "./annotationGeometry";
 import type { Vec2 } from "../geometry/line";
 import type { PatternDocument } from "./schema";
 import { asCubic } from "./segments";
+import { expandPieceSelection } from "./pieces";
 import {
   cubicTouchesBox,
   lineTouchesBox,
@@ -64,7 +65,7 @@ export function translateEdges(
 
 export function itemsInBox(doc: PatternDocument, box: Bounds): string[] {
   return [
-    ...edgesInBox(doc, box),
+    ...expandPieceSelection(doc, edgesInBox(doc, box)),
     ...Object.values(doc.annotations)
       .filter((mark) => annotationTouchesBox(mark, box))
       .map((mark) => mark.id),

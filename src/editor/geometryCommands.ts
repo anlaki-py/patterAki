@@ -9,6 +9,12 @@ import {
 } from "../document/contourValidation";
 import { formatContourIssues } from "../geometry/contourValidation";
 import {
+  closedCycleForEdge,
+  createPieceFromEdge,
+  expandPieceSelection,
+  pieceForEdge,
+} from "../document/pieces";
+import {
   applyPointPlacement,
   placementOnEdge,
 } from "../document/pointPlacement";
@@ -63,6 +69,29 @@ export const geometryCommands = {
   curve: edgeCommand("curve", "Convert to curve"),
   reset: edgeCommand("reset", "Reset curve / remove handles"),
   intersections: edgeCommand("intersections", "Create points at intersections"),
+  createPiece: defineCommand<string>(
+    "piece.create-from-contour",
+    "Create pattern piece from closed contour",
+    (edgeId) => {
+      const s = useEditor.getState();
+      const next = createPieceFromEdge(s.document, edgeId, createId());
+      s.commit(next);
+      useEditor.setState({
+        tool: "select",
+        selected: expandPieceSelection(next, [edgeId]),
+        selectedGuide: null,
+        activePoint: null,
+      });
+    },
+    (edgeId) => {
+      const s = useEditor.getState();
+      return (
+        !s.preview &&
+        !!closedCycleForEdge(s.document, edgeId) &&
+        !pieceForEdge(s.document, edgeId)
+      );
+    },
+  ),
   delete: defineCommand(
     "delete",
     "Delete selection",

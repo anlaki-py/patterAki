@@ -4,7 +4,7 @@ import { selectionBounds, type Bounds } from "../geometry/bounds";
 import { distance, type Vec2 } from "../geometry/line";
 import type { SnapKind } from "../geometry/snapping";
 import { constrainToAxis, movementAxis, type MovementAxis } from "./movement";
-import { clickSelection } from "./selection";
+import { clickPieceSelection } from "../document/pieces";
 import { useEditor } from "./store";
 
 export type SelectionDragInfo = {
@@ -42,7 +42,7 @@ export function beginSelectionDrag(options: {
   initial.cancel();
   const baseSelection = initial.selected;
   const selected = itemId
-    ? clickSelection(baseSelection, itemId, additive)
+    ? clickPieceSelection(initial.document, baseSelection, itemId, additive)
     : additive
       ? baseSelection
       : [];

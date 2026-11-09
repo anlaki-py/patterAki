@@ -67,23 +67,31 @@ it("rejects duplicate item IDs and invalid guide positions", () => {
 it("round-trips guides through editable JSON and migrates a version 3 project", () => {
   const doc = addGuide(emptyDocument("round-trip"), "x", -240.75, "v");
   expect(parseProject(JSON.stringify(doc))).toEqual(doc);
-  const { guides: _guides, ...version3 } = doc;
-  expect(_guides).toEqual(doc.guides);
-  const migrated = parseProject(
-    JSON.stringify({ ...version3, schemaVersion: 3 }),
-  );
-  expect(migrated).toEqual({ ...doc, guides: {} });
-  expect(migrated.schemaVersion).toBe(4);
-  const { guides: _old, annotations: _annotations, ...version2 } = doc;
-  expect(_old).toEqual(doc.guides);
-  expect(_annotations).toEqual({});
-  const fromV2 = parseProject(
-    JSON.stringify({ ...version2, schemaVersion: 2 }),
-  );
-  expect(fromV2).toEqual({ ...doc, guides: {}, annotations: {} });
+  const version3 = {
+    schemaVersion: 3,
+    id: doc.id,
+    name: doc.name,
+    points: doc.points,
+    segments: doc.segments,
+    unitsDisplay: doc.unitsDisplay,
+    annotations: doc.annotations,
+  };
+  const migrated = parseProject(JSON.stringify(version3));
+  expect(migrated).toEqual({ ...doc, guides: {}, pieces: {} });
+  expect(migrated.schemaVersion).toBe(5);
+  const version2 = {
+    schemaVersion: 2,
+    id: doc.id,
+    name: doc.name,
+    points: doc.points,
+    segments: doc.segments,
+    unitsDisplay: doc.unitsDisplay,
+  };
+  const fromV2 = parseProject(JSON.stringify(version2));
+  expect(fromV2).toEqual({ ...doc, guides: {}, annotations: {}, pieces: {} });
 });
 
 it("rejects unknown future schema versions without relabelling data", () => {
   const doc = addGuide(emptyDocument("future"), "y", 20, "h");
-  expect(() => documentSchema.parse({ ...doc, schemaVersion: 5 })).toThrow();
+  expect(() => documentSchema.parse({ ...doc, schemaVersion: 6 })).toThrow();
 });

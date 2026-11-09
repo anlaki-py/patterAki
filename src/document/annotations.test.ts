@@ -159,7 +159,23 @@ describe("version migrations", () => {
   );
   it("rejects corrupt legacy geometry, unknown versions and unexpected mark data instead of dropping it", () => {
     const doc = fixture();
-    expect(documentSchema.safeParse({ ...doc, schemaVersion: 5 }).success).toBe(
+    // Version 4 is now a supported legacy format; its valid shape migrates to v5.
+    const legacyV4 = {
+      schemaVersion: 4,
+      id: doc.id,
+      name: doc.name,
+      points: doc.points,
+      segments: doc.segments,
+      unitsDisplay: doc.unitsDisplay,
+      annotations: doc.annotations,
+      guides: doc.guides,
+    };
+    expect(documentSchema.safeParse(legacyV4).success).toBe(true);
+    // V5-only piece data on a V4 document must not be silently discarded.
+    expect(documentSchema.safeParse({ ...legacyV4, pieces: {} }).success).toBe(
+      false,
+    );
+    expect(documentSchema.safeParse({ ...doc, schemaVersion: 6 }).success).toBe(
       false,
     );
     // Even an empty extra field is unsupported in historical formats.
