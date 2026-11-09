@@ -56,6 +56,42 @@ function compareCandidates(pointer: Vec2, a: SnapCandidate, b: SnapCandidate) {
 export function sortSnapCandidates(pointer: Vec2, candidates: SnapCandidate[]) {
   return [...candidates].sort((a, b) => compareCandidates(pointer, a, b));
 }
+
+// Unlike an edge or a guide projection, these are fixed places in the drawing.
+// When two different places are both in range, the closest should win; a
+// midpoint under the pointer must not lose to an endpoint several pixels away.
+// When two targets occupy (visually) the same place, topology priority wins.
+const fixedTargetKinds: ReadonlySet<SnapKind> = new Set([
+  "endpoint",
+  "intersection",
+  "guide-intersection",
+  "midpoint",
+  "perpendicular",
+]);
+const isFixedTarget = (candidate: SnapCandidate) =>
+  fixedTargetKinds.has(candidate.kind);
+
+function closestFixedTarget(
+  pointer: Vec2,
+  eligible: SnapCandidate[],
+  tolerance: number,
+): SnapCandidate | undefined {
+  const fixed = eligible.filter(isFixedTarget);
+  if (!fixed.length) return undefined;
+  const nearestDistance = Math.min(
+    ...fixed.map((c) => distance(pointer, c.point)),
+  );
+  // Only genuinely coincident targets use topology priority. A visual
+  // half-pixel tie would make the midpoint of a sub-millimetre line unreachable.
+  const tieDistance = Math.min(tolerance * 1e-3, 1e-6);
+  return sortSnapCandidates(
+    pointer,
+    fixed.filter(
+      (c) => distance(pointer, c.point) <= nearestDistance + tieDistance,
+    ),
+  )[0];
+}
+
 export function resolveSnapCandidates(
   pointer: Vec2,
   candidates: SnapCandidate[],
@@ -82,27 +118,43 @@ export function resolveSnapCandidates(
     (candidate) => distance(pointer, candidate.point) <= tolerance,
   );
   const sorted = sortSnapCandidates(pointer, eligible);
-  const best = sorted[0];
+  // Fixed topology always outranks projections, alignment rays and the grid,
+  // but is chosen by distance before priority when targets are distinct.
+  const best = closestFixedTarget(pointer, eligible, tolerance) ?? sorted[0];
   const release = tolerance * Math.max(1, options.releaseMultiplier ?? 1.5);
   let held: SnapCandidate | undefined;
   if (options.previousLock) {
-    // Hysteresis keeps the chosen target between acquisition radius and the
-    // release radius even though no new target could be acquired there.
+    // A held edge/guide is recomputed from the current pointer. Keep hysteresis
+    // for genuine movement away from a target, not for passing over a more
+    // specific fixed snap on that edge.
     held = finiteCandidates.find(
       (candidate) => candidate.targetId === options.previousLock!.targetId,
     );
     if (held && distance(pointer, held.point) > release) held = undefined;
-    // An exact topology target can replace a held weak candidate when the raw
-    // pointer lands within a small inner radius. Without this exception a held
-    // grid/alignment target could make a nearby endpoint unreachable.
     if (
       held &&
       best &&
-      best.priority <= 2 &&
-      best.priority < held.priority &&
-      distance(pointer, best.point) <= tolerance * 0.4
-    )
-      held = best;
+      held.targetId !== best.targetId &&
+      isFixedTarget(best)
+    ) {
+      const bestDistance = distance(pointer, best.point);
+      const heldDistance = distance(pointer, held.point);
+      // A held projection (edge/guide/grid/alignment) must yield anywhere in
+      // the pickup radius: otherwise sliding toward a midpoint retains the
+      // dynamic "On edge" lock indefinitely. Keep the smaller inner radius
+      // when switching between two fixed targets to avoid flicker.
+      if (
+        (!isFixedTarget(held) && best.priority < held.priority) ||
+        // An explicit cycle must start at the currently selected fixed target.
+        // Re-basing to a nearer endpoint before applying the offset makes
+        // repeated cycles bounce instead of wrapping through all choices.
+        ((options.cycleOffset ?? 0) === 0 &&
+          isFixedTarget(held) &&
+          bestDistance <= tolerance * 0.4 &&
+          bestDistance + Math.min(tolerance * 1e-3, 1e-6) < heldDistance)
+      )
+        held = best;
+    }
   }
   const base = held ?? best;
   if (!base) return { choices: [], choiceIndex: 0, lock: null };
