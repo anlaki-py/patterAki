@@ -40,14 +40,22 @@ import { EditorViewport } from "../editor/EditorViewport";
 import { CommandMenuItem, commandProps } from "../ui/CommandControls";
 import { Inspector } from "../ui/Inspector";
 import { SnapSettings } from "../ui/SnapSettings";
+import { SaveFeedback } from "../ui/SaveFeedback";
 import { emptyDocument, parseProject } from "../document/schema";
 import { saveNow, startPersistence } from "../persistence/autosave";
 import {
   getSavedProject,
   deleteSavedProject,
 } from "../persistence/projectBrowser";
+import {
+  defaultWorkspaceLayout,
+  readWorkspaceLayout,
+  saveWorkspaceLayout,
+} from "./workspaceLayout";
 import { RenameProjectDialog, SavedProjectsDialog } from "./ProjectDialogs";
 import { ShortcutHelp } from "./ShortcutHelp";
+import "./m02.css";
+
 const icons = {
   select: MousePointer2,
   point: Plus,
@@ -57,6 +65,7 @@ const icons = {
   rectangle: Square,
   pan: Hand,
 };
+
 function exportJson() {
   const doc = useEditor.getState().document;
   const url = URL.createObjectURL(
@@ -70,13 +79,26 @@ function exportJson() {
   link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
 export function App() {
   const s = useEditor();
   const mobile = useMediaQuery("(max-width: 760px)");
-  const [properties, setProperties] = useState(false);
+  const [layout, setLayout] = useState(readWorkspaceLayout);
+  const [layoutEpoch, setLayoutEpoch] = useState(0);
+  const properties = layout.inspectorVisible;
+  const setProperties = (value: boolean | ((previous: boolean) => boolean)) => {
+    setLayout((current) => ({
+      ...current,
+      inspectorVisible:
+        typeof value === "function" ? value(current.inspectorVisible) : value,
+    }));
+  };
   const file = useRef<HTMLInputElement>(null);
   const { toggleColorScheme } = useMantineColorScheme();
   useEffect(startPersistence, []);
+  useEffect(() => {
+    saveWorkspaceLayout(layout);
+  }, [layout]);
   const reportError = (error: unknown) =>
     notifications.show({
       color: "red",
@@ -222,6 +244,14 @@ export function App() {
   const propertiesCommand = commands.properties.bind({
     execute: () => setProperties((visible) => !visible),
   });
+  const resetLayout = () => {
+    setLayout({ ...defaultWorkspaceLayout });
+    // Remount the group so the saved width is reset even without a page reload.
+    setLayoutEpoch((number) => number + 1);
+  };
+  const layoutResetCommand = commands.resetLayout.bind({
+    execute: resetLayout,
+  });
   const helpCommand = commands.help.bind({ execute: help });
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
@@ -243,7 +273,9 @@ export function App() {
         <Group gap={0} wrap="nowrap">
           <Menu>
             <Menu.Target>
-              <Button variant="subtle">File</Button>
+              <Button size="compact-sm" variant="subtle">
+                File
+              </Button>
             </Menu.Target>
             <Menu.Dropdown>
               {fileCommands.map((command) => (
@@ -253,7 +285,9 @@ export function App() {
           </Menu>
           <Menu>
             <Menu.Target>
-              <Button variant="subtle">Edit</Button>
+              <Button size="compact-sm" variant="subtle">
+                Edit
+              </Button>
             </Menu.Target>
             <Menu.Dropdown>
               {editCommands.map((command) => (
@@ -263,19 +297,26 @@ export function App() {
           </Menu>
           <Menu>
             <Menu.Target>
-              <Button variant="subtle">View</Button>
+              <Button size="compact-sm" variant="subtle">
+                View
+              </Button>
             </Menu.Target>
             <Menu.Dropdown>
-              {[themeCommand, commands.grid.bind(), propertiesCommand].map(
-                (command) => (
-                  <CommandMenuItem key={command.id} command={command} />
-                ),
-              )}
+              {[
+                themeCommand,
+                commands.grid.bind(),
+                propertiesCommand,
+                layoutResetCommand,
+              ].map((command) => (
+                <CommandMenuItem key={command.id} command={command} />
+              ))}
             </Menu.Dropdown>
           </Menu>
           <Menu>
             <Menu.Target>
-              <Button variant="subtle">Pattern</Button>
+              <Button size="compact-sm" variant="subtle">
+                Pattern
+              </Button>
             </Menu.Target>
             <Menu.Dropdown>
               {[
@@ -292,7 +333,9 @@ export function App() {
           </Menu>
           <Menu>
             <Menu.Target>
-              <Button variant="subtle">Tools</Button>
+              <Button size="compact-sm" variant="subtle">
+                Tools
+              </Button>
             </Menu.Target>
             <Menu.Dropdown>
               {toolCommands.map((command) => (
@@ -302,7 +345,9 @@ export function App() {
           </Menu>
           <Menu>
             <Menu.Target>
-              <Button variant="subtle">Help</Button>
+              <Button size="compact-sm" variant="subtle">
+                Help
+              </Button>
             </Menu.Target>
             <Menu.Dropdown>
               <CommandMenuItem command={helpCommand} />
@@ -322,6 +367,7 @@ export function App() {
           return (
             <Tooltip key={t.id} label={`${t.label} (${t.shortcut})`}>
               <Button
+                size="compact-sm"
                 variant={s.tool === t.id ? "light" : "default"}
                 aria-pressed={s.tool === t.id}
                 leftSection={<Icon size={16} />}
@@ -338,6 +384,7 @@ export function App() {
             label={`${editCommands[i].label} (${editCommands[i].shortcut})`}
           >
             <ActionIcon
+              size="sm"
               variant="default"
               aria-label={editCommands[i].label}
               {...commandProps(editCommands[i])}
@@ -346,42 +393,71 @@ export function App() {
             </ActionIcon>
           </Tooltip>
         ))}
-        <Switch
-          size="xs"
-          label={commands.snap.label}
-          checked={s.snap}
-          onChange={() => commands.snap.bind().run()}
-        />
+        <Tooltip label="Enable or disable drafting snap targets">
+          <Switch
+            size="xs"
+            label={commands.snap.label}
+            checked={s.snap}
+            onChange={() => commands.snap.bind().run()}
+          />
+        </Tooltip>
         <SnapSettings />
-        <ActionIcon
-          variant="default"
-          aria-label="Toggle color scheme"
-          {...commandProps(themeCommand)}
-        >
-          <Moon size={16} />
-        </ActionIcon>
-        <Button
-          variant="default"
-          leftSection={<SlidersHorizontal size={16} />}
-          {...commandProps(propertiesCommand)}
-          aria-expanded={properties}
-        >
-          {propertiesCommand.label}
-        </Button>
+        <Tooltip label="Toggle light / dark theme">
+          <ActionIcon
+            size="sm"
+            variant="default"
+            aria-label="Toggle color scheme"
+            {...commandProps(themeCommand)}
+          >
+            <Moon size={16} />
+          </ActionIcon>
+        </Tooltip>
+        <Tooltip label="Show or hide the Properties panel">
+          <Button
+            size="compact-sm"
+            variant="default"
+            leftSection={<SlidersHorizontal size={16} />}
+            {...commandProps(propertiesCommand)}
+            aria-expanded={properties}
+          >
+            {propertiesCommand.label}
+          </Button>
+        </Tooltip>
       </Group>
       <main className="main-area">
         {mobile ? (
           <EditorViewport />
         ) : (
-          <PanelGroup orientation="horizontal">
+          <PanelGroup
+            key={layoutEpoch}
+            orientation="horizontal"
+            onLayoutChanged={(sizes, meta) => {
+              // Only persist direct resize gestures, not responsive constraint changes.
+              if (!properties || !meta?.isUserInteraction) return;
+              const width = sizes.properties;
+              if (typeof width !== "number" || !Number.isFinite(width)) return;
+              const nextWidth =
+                Math.round(Math.min(40, Math.max(22, width)) * 10) / 10;
+              setLayout((current) =>
+                current.inspectorWidthPct === nextWidth
+                  ? current
+                  : { ...current, inspectorWidthPct: nextWidth },
+              );
+            }}
+          >
             <Panel id="workspace" minSize="40%">
               <EditorViewport />
             </Panel>
-            {properties && <Separator className="panel-separator" />}
+            {properties && (
+              <Separator
+                className="panel-separator"
+                aria-label="Resize properties panel"
+              />
+            )}
             {properties && (
               <Panel
                 id="properties"
-                defaultSize="280px"
+                defaultSize={`${layout.inspectorWidthPct}%`}
                 minSize="230px"
                 maxSize="40%"
               >
@@ -399,7 +475,7 @@ export function App() {
         justify="space-between"
         wrap="nowrap"
       >
-        <Text size="xs">
+        <Text size="xs" truncate>
           {s.tool} ·{" "}
           {s.tool === "select"
             ? `${s.selected.length} selected · Shift-click to add/remove · Drag empty space to select`
@@ -409,9 +485,15 @@ export function App() {
                 ? "Click an existing edge to insert a point"
                 : "Click in the workspace to begin"}
         </Text>
-        <Text size="xs" role="status">
-          {s.saveStatus}
-        </Text>
+        <SaveFeedback
+          status={s.saveStatus}
+          onRetry={() => {
+            void commands.save.bind({ execute: saveNow }).run();
+          }}
+          onExport={() =>
+            commands.exportProject.bind({ execute: exportJson }).run()
+          }
+        />
       </Group>
       <Drawer
         opened={!!mobile && properties}

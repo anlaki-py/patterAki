@@ -1,0 +1,190 @@
+/* M0.2: compact, canvas-first workspace; all colors come from Mantine. */
+.app-shell,
+.main-area,
+.workspace,
+.canvas-area {
+  min-width: 0;
+  min-height: 0;
+}
+
+.app-shell {
+  overflow: hidden;
+}
+
+.main-area {
+  flex: 1 1 0;
+}
+
+.main-area > [data-group],
+.main-area > .workspace {
+  height: 100%;
+  min-height: 0;
+}
+
+.inspector {
+  min-width: 0;
+  background: var(--mantine-color-body);
+}
+
+.panel-separator {
+  cursor: col-resize;
+  touch-action: none;
+  flex-shrink: 0;
+}
+
+.menu-bar,
+.toolbar,
+.status-bar {
+  background: var(--mantine-color-body);
+}
+
+.menu-bar > .mantine-Group-root,
+.toolbar > * {
+  flex-shrink: 0;
+}
+
+:where(.app-shell, .workspace)
+  :is(
+    button,
+    [role="menuitem"],
+    [role="separator"],
+    input,
+    [role="button"],
+    [role="switch"],
+    [role="slider"]
+  ):focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 2px;
+}
+
+:where(.app-shell, .workspace) :is(button, [role="menuitem"]):disabled {
+  cursor: not-allowed;
+}
+
+/* Permanent vertices are informational. Only .point-hit receives pointer events. */
+.point {
+  pointer-events: none;
+  stroke: var(--draft-line);
+  fill: var(--draft-background);
+  stroke-width: 1.25;
+  vector-effect: non-scaling-stroke;
+}
+.point-active {
+  stroke: var(--draft-selection);
+  stroke-width: 1.75;
+}
+.tool-select .edge-hit,
+.tool-select .annotation {
+  cursor: pointer;
+}
+.tool-select .point-hit {
+  cursor: move;
+}
+.tool-curve .edge-hit,
+.tool-curve .curve-handle {
+  cursor: crosshair;
+}
+.tool-curve .point-hit {
+  cursor: move;
+}
+.tool-point .edge-hit {
+  cursor: copy;
+}
+.tool-pan,
+.tool-pan .edge-hit,
+.tool-pan .point-hit,
+.tool-pan .annotation {
+  cursor: grab;
+}
+.tool-pan:active,
+.tool-pan:active .edge-hit,
+.tool-pan:active .point-hit,
+.tool-pan:active .annotation {
+  cursor: grabbing;
+}
+/* Drawing tools must never let permanent vertex hit circles consume taps. */
+.tool-line .point-hit,
+.tool-polyline .point-hit,
+.tool-rectangle .point-hit,
+.tool-point .point-hit,
+.tool-pan .point-hit {
+  pointer-events: none;
+}
+.tool-select:active .edge-hit,
+.tool-select:active .point-hit,
+.tool-curve:active .point-hit {
+  cursor: grabbing;
+}
+.tool-curve:active .edge-hit,
+.tool-curve:active .curve-handle {
+  cursor: crosshair;
+}
+/* Snap and invalid feedback is also visible through the overlay, not cursor alone. */
+.drafting-surface:has(.snap-marker):not(:has(.invalid-preview)) {
+  cursor: cell;
+}
+.drafting-surface:has(.invalid-preview),
+.drafting-surface:has(.invalid-preview) .edge-hit,
+.drafting-surface:has(.invalid-preview) .point-hit {
+  cursor: not-allowed;
+}
+
+.save-feedback {
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: min(100%, 350px);
+  white-space: nowrap;
+}
+.save-feedback .mantine-Text-root {
+  min-width: 0;
+  max-width: 190px;
+}
+.save-feedback .mantine-ActionIcon-root {
+  flex: 0 0 auto;
+}
+.status-bar > .mantine-Text-root {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+@media (min-width: 761px) and (max-width: 1024px) {
+  .menu-bar,
+  .toolbar {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+  .toolbar {
+    flex-shrink: 0;
+  }
+  .toolbar > * {
+    flex-shrink: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .status-bar {
+    gap: 6px;
+    overflow: hidden;
+    flex: 0 0 auto;
+    min-height: 28px;
+    max-height: none;
+    height: auto;
+    padding-block: 2px;
+  }
+  .status-bar > .mantine-Text-root {
+    flex: 1 1 0;
+    min-width: 0;
+    font-size: 11px;
+  }
+  .save-feedback .mantine-Text-root {
+    max-width: 105px;
+    font-size: 11px;
+  }
+  .save-feedback .mantine-ActionIcon-root {
+    min-width: 26px;
+    min-height: 26px;
+  }
+  .mantine-Drawer-content {
+    max-height: 90dvh;
+  }
+}

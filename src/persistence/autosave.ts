@@ -6,19 +6,32 @@ import {
   saveEditorSettings,
   saveProject,
 } from "./projects";
+
 export async function saveNow(): Promise<boolean> {
   const { document, revision, ready } = useEditor.getState();
   if (!ready) return false;
+  // Capture identity by value: a stale write must never change a new project's status.
+  const projectId = document.id;
+  const isCurrent = () => {
+    const state = useEditor.getState();
+    return state.document.id === projectId && state.revision === revision;
+  };
   useEditor.setState({ saveStatus: "Saving…" });
   try {
+    // saveProject serializes writes so slower older saves never overwrite newer ones.
     await saveProject(document);
-    if (useEditor.getState().revision === revision)
+    // Older in-flight writes must not mark newer edits as saved.
+    if (isCurrent()) {
       useEditor.setState({ saveStatus: "Saved locally" });
-    return true;
+      return true;
+    }
+    // Caller must not switch projects based on a save of an old revision.
+    return false;
   } catch {
-    useEditor.setState({
-      saveStatus: "Save failed. Export JSON to keep a backup.",
-    });
+    if (isCurrent())
+      useEditor.setState({
+        saveStatus: "Save failed. Retry or export JSON to keep a backup.",
+      });
     return false;
   }
 }
@@ -42,7 +55,7 @@ export function startPersistence() {
         useEditor.setState({
           ready: true,
           saveStatus:
-            "Could not open local storage. Export JSON to keep a backup.",
+            "Could not open local storage. Retry or export JSON to keep a backup.",
         });
     });
   void loadEditorSettings()

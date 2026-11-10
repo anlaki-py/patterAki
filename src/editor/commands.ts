@@ -4,7 +4,6 @@ import { commitTranslation } from "./movement";
 import { useEditor, type Tool } from "./store";
 import { notifications } from "@mantine/notifications";
 export { dispatchShortcut } from "./command";
-
 const tools: { id: Tool; label: string; key: string }[] = [
   { id: "select", label: "Select", key: "v" },
   { id: "curve", label: "Curve", key: "c" },
@@ -150,6 +149,7 @@ export const commands = {
   theme: localCommand("view.theme", "Toggle light / dark"),
   properties: localCommand("view.properties", "Properties"),
   hideProperties: localCommand("view.hide-properties", "Hide properties"),
+  resetLayout: localCommand("view.reset-layout", "Reset workspace layout"),
   help: localCommand("help.controls", "Drafting help"),
   shortcutReference: localCommand("help.shortcuts", "Keyboard shortcuts"),
   fit: localCommand("view.fit", "Fit all"),

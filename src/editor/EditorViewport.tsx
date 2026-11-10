@@ -1002,6 +1002,7 @@ export function EditorViewport() {
                   selectedIds={s.selected}
                   scale={view.scale}
                   showPoints={s.tool === "point"}
+                  interactivePoints={s.tool === "select" || s.tool === "curve"}
                   showHandles={s.tool === "curve"}
                 />
                 <SvgAnnotations

@@ -41,11 +41,11 @@
 
 ### M0.2 Workspace state and interaction feedback
 
-- [ ] Persist inspector visibility/width and reset-layout option. Verify desktop resizing and mobile drawer transitions across reloads.
-- [ ] Confirm menu, toolbar, inspector, status bar, and selection controls share Mantine's theme, compact sizing, meaningful tooltips, focus/disabled/error states, and Lucide-only icons.
-- [ ] Keep the canvas dominant at desktop, tablet, and phone widths; no glass surfaces, gradients, second design system, oversized cards, or floating IDE-style docking.
-- [ ] Make pointer cursor states specific to selectable edge, point, drag, bend, pan, invalid operation, and active snap. Avoid hover-only or right-click-only commands.
-- [ ] Show reliable dirty/saving/saved/error status and actionable storage-failure feedback; don't spam autosave notifications.
+- [x] Persist inspector visibility/width and reset-layout option. Verify desktop resizing and mobile drawer transitions across reloads.
+- [x] Confirm menu, toolbar, inspector, status bar, and selection controls share Mantine's theme, compact sizing, meaningful tooltips, focus/disabled/error states, and Lucide-only icons.
+- [x] Keep the canvas dominant at desktop, tablet, and phone widths; no glass surfaces, gradients, second design system, oversized cards, or floating IDE-style docking.
+- [x] Make pointer cursor states specific to selectable edge, point, drag, bend, pan, invalid operation, and active snap. Avoid hover-only or right-click-only commands.
+- [x] Show reliable dirty/saving/saved/error status and actionable storage-failure feedback; don't spam autosave notifications.
 
 **M0 gate:** all visible controls execute a real command; shortcuts cannot corrupt numeric editing; inspector settings survive restart; app shell remains consistent at wide and narrow widths.
 
