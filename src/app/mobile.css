@@ -126,7 +126,8 @@
   }
 
   /* Smaller action rows under the drawing surface (e.g. exact point). */
-  .workspace > .mantine-Group-root:not(.workspace-controls):not(.precision-bar) {
+  .workspace
+    > .mantine-Group-root:not(.workspace-controls):not(.precision-bar) {
     flex-wrap: nowrap !important;
     flex-shrink: 0;
     gap: 6px !important;
@@ -135,7 +136,9 @@
     scrollbar-width: none;
   }
 
-  .workspace > .mantine-Group-root:not(.workspace-controls):not(.precision-bar) > * {
+  .workspace
+    > .mantine-Group-root:not(.workspace-controls):not(.precision-bar)
+    > * {
     flex-shrink: 0;
   }
 
