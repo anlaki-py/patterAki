@@ -6,7 +6,6 @@ import {
   Drawer,
   Group,
   Menu,
-  Stack,
   Switch,
   Text,
   Tooltip,
@@ -43,6 +42,12 @@ import { Inspector } from "../ui/Inspector";
 import { SnapSettings } from "../ui/SnapSettings";
 import { emptyDocument, parseProject } from "../document/schema";
 import { saveNow, startPersistence } from "../persistence/autosave";
+import {
+  getSavedProject,
+  deleteSavedProject,
+} from "../persistence/projectBrowser";
+import { RenameProjectDialog, SavedProjectsDialog } from "./ProjectDialogs";
+import { ShortcutHelp } from "./ShortcutHelp";
 const icons = {
   select: MousePointer2,
   point: Plus,
@@ -60,7 +65,9 @@ function exportJson() {
   const link = document.createElement("a");
   link.href = url;
   link.download = `${doc.name.replace(/[^\w -]/g, "_")}.json`;
+  document.body.appendChild(link);
   link.click();
+  link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 export function App() {
@@ -70,87 +77,146 @@ export function App() {
   const file = useRef<HTMLInputElement>(null);
   const { toggleColorScheme } = useMantineColorScheme();
   useEffect(startPersistence, []);
-  const replaceProject = (action: () => void) => {
+  const reportError = (error: unknown) =>
+    notifications.show({
+      color: "red",
+      message:
+        error instanceof Error
+          ? error.message
+          : "Could not complete this action.",
+    });
+  const switchWorkspace = (
+    action: () => void | Promise<void>,
+  ): Promise<boolean> => {
+    const perform = async () => {
+      try {
+        if (!(await saveNow())) {
+          notifications.show({
+            color: "red",
+            message:
+              "Could not save your current project. Export JSON before switching.",
+          });
+          return false;
+        }
+        // A draft is transient and must not be carried into another project.
+        useEditor.getState().cancel();
+        await action();
+        return true;
+      } catch (error) {
+        reportError(error);
+        return false;
+      }
+    };
+    const state = useEditor.getState();
+    if (!state.hasDraft && !state.preview && !state.gestureActive)
+      return perform();
+    return new Promise((resolve) => {
+      let confirmed = false;
+      modals.openConfirmModal({
+        title: "Discard the unfinished edit?",
+        children: (
+          <Text size="sm">
+            Committed changes will be saved. The active drawing or drag will be
+            discarded.
+          </Text>
+        ),
+        labels: {
+          confirm: "Discard edit and continue",
+          cancel: "Keep editing",
+        },
+        onClose: () => {
+          if (!confirmed) resolve(false);
+        },
+        onConfirm: () => {
+          confirmed = true;
+          void perform().then(resolve);
+        },
+      });
+    });
+  };
+  const openProjects = () =>
+    modals.open({
+      modalId: "saved-projects",
+      title: "Open saved project",
+      size: "lg",
+      children: (
+        <SavedProjectsDialog
+          currentId={useEditor.getState().document.id}
+          onOpen={async (id) => {
+            const opened = await switchWorkspace(async () => {
+              const doc = await getSavedProject(id);
+              useEditor.getState().load(doc);
+            });
+            if (opened) modals.close("saved-projects");
+            return opened;
+          }}
+          onDelete={(id, refresh) => deleteProject(id, refresh)}
+        />
+      ),
+    });
+  const deleteProject = (id: string, refresh?: () => void) => {
     modals.openConfirmModal({
-      title: "Replace the current workspace?",
+      title: "Delete saved project?",
       children: (
         <Text size="sm">
-          Export JSON first if you need a portable backup. The current project
-          will be saved locally before switching.
+          This permanently deletes this project's local copy. Export JSON first
+          if you need a backup. Other projects are not affected.
         </Text>
       ),
-      labels: { confirm: "Save and continue", cancel: "Cancel" },
+      labels: { confirm: "Delete project", cancel: "Cancel" },
+      confirmProps: { color: "red" },
       onConfirm: () => {
-        void saveNow().then((saved) => {
-          if (saved) action();
-          else
-            notifications.show({
-              color: "red",
-              message:
-                "Could not save. Export a JSON backup before replacing this workspace.",
-            });
-        });
+        void (async () => {
+          const wasCurrent = useEditor.getState().document.id === id;
+          // Flush queued writes before deleting, so an earlier autosave cannot restore it.
+          if (wasCurrent && !(await saveNow()))
+            throw new Error(
+              "Local storage could not save. Export JSON before deleting.",
+            );
+          await deleteSavedProject(id);
+          if (wasCurrent) useEditor.getState().load(emptyDocument(createId()));
+          refresh?.();
+        })().catch(reportError);
       },
     });
   };
+  const renameProject = () =>
+    modals.open({
+      modalId: "rename-project",
+      title: "Rename project",
+      children: (
+        <RenameProjectDialog
+          name={useEditor.getState().document.name}
+          onClose={() => modals.close("rename-project")}
+        />
+      ),
+    });
   const help = () =>
     modals.open({
-      title: "Drafting controls",
+      title: "Drafting help and keyboard shortcuts",
+      size: "lg",
       children: (
-        <Stack gap="xs">
-          <Text size="sm">
-            Line: click start and end. Polyline: click successive points, then
-            Finish line or Enter. Click the first point to close.
-          </Text>
-          <Text size="sm">
-            Rectangle: click its origin, then enter width and height. Select:
-            click or drag an edge to select and move it. Shift-click toggles
-            edges; drag empty space to box-select. Ctrl/Cmd+A selects all. Drag
-            a selected endpoint to reshape, or double-click the edge to insert a
-            point. Add point (X) also inserts on click. Right-click an edge for
-            Change length, Delete, Reset curve, or Create points at
-            intersections. Point at exact distance opens the draggable
-            measurement window.
-          </Text>
-          <Text size="sm">
-            Right-click empty space or use Marks to add text, arrows,
-            grainlines, fold guides and drill points. Double-click a mark to
-            edit its size and angle; drag to move it. Marks support Shift-click,
-            box selection and Ctrl/Cmd+A.
-          </Text>
-          <Text size="sm">
-            Curve (C): drag an edge to bend it, then drag the control arms.
-            Shared points have an incoming and outgoing arm. Properties offers
-            Convert to curve and Convert to straight line.
-          </Text>
-          <Text size="sm">
-            Wheel zooms. Pan tool, middle drag, or Space+drag pans. Shift
-            constrains a line to 45° increments. Snapping finds edges, midpoints
-            and horizontal/vertical guides from existing points. Alt bypasses
-            snap. Escape cancels a draft.
-          </Text>
-          <Text size="sm">
-            Exact typed dimensions take priority over snapping. Save local
-            changes with Ctrl/Cmd+S. Export JSON for a portable backup.
-          </Text>
-          <Text size="sm">
-            This version supports straight and cubic drafting paths and
-            annotations. Sewing metadata, seam allowance, PDF printing, PWA
-            caching and touch pinch are not implemented yet.
-          </Text>
-        </Stack>
+        <div style={{ maxHeight: "65dvh", overflowY: "auto" }}>
+          <ShortcutHelp tool={useEditor.getState().tool} />
+        </div>
       ),
     });
   const fileCommands = [
     commands.newProject.bind({
-      execute: () =>
-        replaceProject(() =>
+      execute: () => {
+        void switchWorkspace(() =>
           useEditor.getState().load(emptyDocument(createId())),
-        ),
+        );
+      },
     }),
-    commands.importProject.bind({ execute: () => file.current?.click() }),
+    commands.openProject.bind({ execute: openProjects }),
+    commands.renameProjectDialog.bind({ execute: renameProject }),
     commands.save.bind({ execute: saveNow }),
+    commands.importProject.bind({ execute: () => file.current?.click() }),
     commands.exportProject.bind({ execute: exportJson }),
+    commands.deleteProject.bind({
+      execute: () => deleteProject(useEditor.getState().document.id),
+    }),
   ];
   const themeCommand = commands.theme.bind({ execute: toggleColorScheme });
   const propertiesCommand = commands.properties.bind({
@@ -209,6 +275,23 @@ export function App() {
           </Menu>
           <Menu>
             <Menu.Target>
+              <Button variant="subtle">Pattern</Button>
+            </Menu.Target>
+            <Menu.Dropdown>
+              {[
+                commands.createPiece.bind(
+                  s.selected.find((id) => !!s.document.segments[id]) ?? "",
+                ),
+                commands.intersections.bind(),
+                commands.curve.bind(),
+                commands.reset.bind(),
+              ].map((command) => (
+                <CommandMenuItem key={command.id} command={command} />
+              ))}
+            </Menu.Dropdown>
+          </Menu>
+          <Menu>
+            <Menu.Target>
               <Button variant="subtle">Tools</Button>
             </Menu.Target>
             <Menu.Dropdown>
@@ -217,9 +300,17 @@ export function App() {
               ))}
             </Menu.Dropdown>
           </Menu>
-          <Button variant="subtle" {...commandProps(helpCommand)}>
-            {helpCommand.label}
-          </Button>
+          <Menu>
+            <Menu.Target>
+              <Button variant="subtle">Help</Button>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <CommandMenuItem command={helpCommand} />
+              <CommandMenuItem
+                command={commands.shortcutReference.bind({ execute: help })}
+              />
+            </Menu.Dropdown>
+          </Menu>
         </Group>
         <Text size="xs" truncate className="project-title">
           {s.document.name}
@@ -348,13 +439,15 @@ export function App() {
             if (picked.size > 10_000_000)
               throw new Error("Project exceeds the 10 MB import limit.");
             const doc = parseProject(await picked.text());
-            replaceProject(() => s.load({ ...doc, id: createId() }));
+            void switchWorkspace(() =>
+              useEditor.getState().load({ ...doc, id: createId() }),
+            );
           } catch {
             notifications.show({
               color: "red",
               title: "Import failed",
               message:
-                "Choose a valid version 1, 2, 3 or 4 PatternAki JSON project under 10 MB. Your current pattern is unchanged.",
+                "Choose a valid version 1–5 PatternAki JSON project under 10 MB. Your current pattern is unchanged.",
             });
           }
         }}

@@ -9,7 +9,7 @@ import {
   Text,
   TextInput,
 } from "@mantine/core";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useEditor } from "../editor/store";
 import { commands } from "../editor/commands";
 import { commandProps, notifyCommand } from "./CommandControls";
@@ -17,6 +17,24 @@ import { distance, type Anchor } from "../geometry/line";
 import { formatLength, unitFactor } from "../document/schema";
 export function Inspector() {
   const s = useEditor();
+  const [nameDraft, setNameDraft] = useState(s.document.name);
+  const cancelNameBlur = useRef(false);
+  useEffect(
+    () => setNameDraft(s.document.name),
+    [s.document.id, s.document.name],
+  );
+  const commitName = () => {
+    if (cancelNameBlur.current) {
+      cancelNameBlur.current = false;
+      setNameDraft(s.document.name);
+      return;
+    }
+    const name = nameDraft.trim();
+    if (commands.rename.bind(name).enabled()) {
+      commands.rename.bind(name).run();
+      setNameDraft(name);
+    } else setNameDraft(s.document.name);
+  };
   const annotation =
     s.selected.length === 1 ? s.document.annotations[s.selected[0]] : undefined;
   const edge =
@@ -39,11 +57,17 @@ export function Inspector() {
       </Text>
       <TextInput
         label={commands.rename.label}
-        value={s.document.name}
+        value={nameDraft}
         maxLength={120}
-        onChange={(e) => {
-          const name = e.currentTarget.value;
-          commands.rename.bind(name).run();
+        onChange={(e) => setNameDraft(e.currentTarget.value)}
+        onBlur={commitName}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+          if (e.key === "Escape") {
+            cancelNameBlur.current = true;
+            setNameDraft(s.document.name);
+            e.currentTarget.blur();
+          }
         }}
       />
       <Select

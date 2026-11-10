@@ -102,7 +102,11 @@ export function dispatchShortcut(
   if (
     event.defaultPrevented ||
     event.isComposing ||
-    isEditingText(event.target)
+    isEditingText(event.target) ||
+    (typeof document !== "undefined" &&
+      !!document.querySelector(
+        '[role="dialog"], [role="menu"], [role="listbox"]',
+      ))
   )
     return false;
   const command = commands.find((candidate) =>

@@ -34,10 +34,10 @@
 ### M0.1 Command consistency
 
 - [x] Centralize **every** menu/toolbar/inspector/shortcut action behind one command registry: stable ID, label, enabled predicate, shortcut display, and execute function. Reuse existing command/history infrastructure rather than adding a second implementation. Completed 2026-11-08 for implemented actions, including context menus and dialog apply/cancel. Registry bindings recheck availability at execution, preserve the existing keymap and document/history operations, and share exact insertion across straight/curved inspectors. Automated command coverage passes; browser checks for menu/toolbar/inspector parity and input/dialog precedence remain pending in README.
-- [ ] Finish `File`, `Edit`, `View`, `Pattern`, `Tools`, and `Help` action wiring. No dead menu items, placeholder dialogs, or duplicate handlers. Hide features until implemented.
-- [ ] Route project actions (new, open, rename, save, import, export, delete) and geometry/piece actions through the same action paths; apply Mantine confirmations only to destructive non-undoable operations.
-- [ ] Add contextual help/shortcut reference with the **actual** active keymap. Preserve implemented keys `V`, `L`, `P`, `R`, `C`, `X`, `H`, Space+drag, undo/redo, select-all, and save. Resolve conflicting suggestions in the specs by keeping working bindings stable and documenting changes, never silently rebinding them.
-- [ ] Enforce input/dialog precedence: no tool shortcuts while typing; Escape/Enter/Backspace act on the current draft or dialog before any global action; focus returns sensibly after commit/cancel.
+- [x] Finish `File`, `Edit`, `View`, `Pattern`, `Tools`, and `Help` action wiring. No dead menu items, placeholder dialogs, or duplicate handlers. Hide features until implemented.
+- [x] Route project actions (new, open, rename, save, import, export, delete) and geometry/piece actions through the same action paths; apply Mantine confirmations only to destructive non-undoable operations.
+- [x] Add contextual help/shortcut reference with the **actual** active keymap. Preserve implemented keys `V`, `L`, `P`, `R`, `C`, `X`, `H`, Space+drag, undo/redo, select-all, and save. Resolve conflicting suggestions in the specs by keeping working bindings stable and documenting changes, never silently rebinding them.
+- [x] Enforce input/dialog precedence: no tool shortcuts while typing; Escape/Enter/Backspace act on the current draft or dialog before any global action; focus returns sensibly after commit/cancel.
 
 ### M0.2 Workspace state and interaction feedback
 
