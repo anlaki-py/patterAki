@@ -1,0 +1,214 @@
+/*
+ * Mobile editor chrome.
+ * Keep toolbars in a single horizontally scrollable row, so wrapping controls
+ * never steal a second row from the SVG drafting canvas.
+ * Import AFTER styles.css in src/main.tsx.
+ */
+@media (max-width: 760px) {
+  .app-shell {
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .menu-bar {
+    flex: 0 0 34px;
+    min-height: 34px;
+    height: 34px;
+    padding-inline: 4px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .menu-bar > .mantine-Group-root {
+    flex-wrap: nowrap;
+  }
+
+  .menu-bar .mantine-Button-root {
+    height: 32px;
+    min-height: 32px;
+    padding-inline: 10px;
+    font-size: 13px;
+  }
+
+  .toolbar {
+    flex: 0 0 48px;
+    height: 48px;
+    min-height: 48px;
+    max-height: 48px;
+    padding: 4px 6px !important;
+    gap: 6px !important;
+    flex-wrap: nowrap !important;
+    align-items: center;
+    overflow-x: auto;
+    overflow-y: hidden;
+    touch-action: pan-x;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .toolbar > * {
+    flex: 0 0 auto;
+  }
+
+  /* A 40px visible control still leaves an easy horizontal touch target. */
+  .toolbar .mantine-Button-root,
+  .toolbar .mantine-ActionIcon-root {
+    min-height: 40px;
+    height: 40px;
+    min-width: 40px;
+    font-size: 13px;
+  }
+
+  .toolbar .mantine-Button-root {
+    padding-inline: 10px;
+  }
+
+  .toolbar .mantine-Button-inner {
+    gap: 5px;
+  }
+
+  .main-area,
+  .workspace,
+  .canvas-area {
+    min-height: 0;
+    min-width: 0;
+  }
+
+  /* Fit / Reset / Zoom / Snap / Guides: one row, swipe for overflow. */
+  .workspace-controls {
+    flex: 0 0 46px;
+    min-height: 46px;
+    height: 46px;
+    max-height: 46px;
+    padding: 3px 7px !important;
+    gap: 6px !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    overflow-y: hidden;
+    touch-action: pan-x;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .workspace-controls > * {
+    flex: 0 0 auto;
+  }
+
+  .workspace-controls .mantine-Button-root {
+    min-height: 38px;
+    height: 38px;
+    padding-inline: 10px;
+    font-size: 13px;
+  }
+
+  /* Numerical drafting controls must remain accessible, without wrapping. */
+  .precision-bar {
+    padding: 4px 7px !important;
+    gap: 7px !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    flex-shrink: 0;
+  }
+
+  .precision-bar > * {
+    flex: 0 0 auto;
+  }
+
+  .precision-bar .mantine-InputWrapper-label {
+    font-size: 11px;
+  }
+
+  /* Smaller action rows under the drawing surface (e.g. exact point). */
+  .workspace > .mantine-Group-root:not(.workspace-controls):not(.precision-bar) {
+    flex-wrap: nowrap !important;
+    flex-shrink: 0;
+    gap: 6px !important;
+    padding: 4px 7px !important;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .workspace > .mantine-Group-root:not(.workspace-controls):not(.precision-bar) > * {
+    flex-shrink: 0;
+  }
+
+  .coordinate-bar {
+    flex: 0 0 23px;
+    height: 23px;
+    min-height: 23px;
+    max-height: 23px;
+    padding: 2px 7px !important;
+    font-size: 11px;
+    line-height: 18px;
+    white-space: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+
+  .status-bar {
+    flex: 0 0 24px;
+    height: 24px;
+    min-height: 24px;
+    max-height: 24px;
+    gap: 8px !important;
+    padding-inline: 7px !important;
+    overflow: hidden;
+    flex-wrap: nowrap !important;
+  }
+
+  .status-bar > .mantine-Text-root:first-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px;
+  }
+
+  .status-bar > .mantine-Text-root:last-child {
+    flex-shrink: 0;
+    white-space: nowrap;
+    font-size: 11px;
+  }
+
+  .toolbar::-webkit-scrollbar,
+  .menu-bar::-webkit-scrollbar,
+  .workspace-controls::-webkit-scrollbar,
+  .precision-bar::-webkit-scrollbar,
+  .coordinate-bar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* In landscape, the redundant shortcut hint is less useful than canvas height. */
+@media (max-width: 760px) and (max-height: 520px) and (orientation: landscape) {
+  .status-bar {
+    display: none;
+  }
+
+  .menu-bar {
+    flex-basis: 30px;
+    height: 30px;
+    min-height: 30px;
+  }
+
+  .menu-bar .mantine-Button-root {
+    height: 28px;
+    min-height: 28px;
+  }
+
+  .toolbar {
+    flex-basis: 44px;
+    height: 44px;
+    min-height: 44px;
+    max-height: 44px;
+    padding-block: 2px !important;
+  }
+}
