@@ -37,6 +37,7 @@ import {
   toolCommands,
 } from "../editor/commands";
 import { EditorViewport } from "../editor/EditorViewport";
+import { handleEditorEscapeDelete } from "../editor/editorKeyboard";
 import { CommandMenuItem, commandProps } from "../ui/CommandControls";
 import { Inspector } from "../ui/Inspector";
 import { SnapSettings } from "../ui/SnapSettings";
@@ -255,16 +256,20 @@ export function App() {
   const helpCommand = commands.help.bind({ execute: help });
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
-      if (useEditor.getState().ready)
-        dispatchShortcut(event, [
-          ...toolCommands,
-          ...editCommands,
-          ...nudgeCommands,
-          ...fileCommands,
-        ]);
+      if (!useEditor.getState().ready) return;
+      if (handleEditorEscapeDelete(event)) {
+        event.stopImmediatePropagation();
+        return;
+      }
+      dispatchShortcut(event, [
+        ...toolCommands,
+        ...editCommands,
+        ...nudgeCommands,
+        ...fileCommands,
+      ]);
     };
-    window.addEventListener("keydown", keydown);
-    return () => window.removeEventListener("keydown", keydown);
+    window.addEventListener("keydown", keydown, true);
+    return () => window.removeEventListener("keydown", keydown, true);
   });
   if (!s.ready) return <Text p="md">Opening local pattern…</Text>;
   return (

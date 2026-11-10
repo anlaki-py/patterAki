@@ -1,3 +1,5 @@
+import { useEditor } from "./store";
+
 export type Shortcut = {
   key: string;
   mod?: boolean;
@@ -45,7 +47,6 @@ export function defineCommand<Context = void>(
     },
   };
 }
-
 // Viewport and dialog state stays with its mounted React owner. A binding is
 // explicit and short-lived; unmounted owners never leave callbacks in a registry.
 export type LocalAction = { execute: () => unknown; enabled?: () => boolean };
@@ -70,6 +71,28 @@ export function isEditingText(target: EventTarget | null) {
       'input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="dialog"],[role="menu"],[role="listbox"],[role="combobox"]',
     )
   );
+}
+/** Hidden portal content must not disable workspace keyboard shortcuts. */
+export function hasOpenShortcutOverlay() {
+  if (typeof document === "undefined") return false;
+  const selector = '[role="dialog"], [role="menu"], [role="listbox"]';
+  // Some test/host environments supply a partial Document with only
+  // querySelector. Treat its result as an open overlay, as earlier
+  // dispatchShortcut versions did. In browsers, check visibility so
+  // hidden Mantine portal content does not block shortcuts.
+  if (typeof document.querySelectorAll !== "function") {
+    return (
+      typeof document.querySelector === "function" &&
+      !!document.querySelector(selector)
+    );
+  }
+  return [...document.querySelectorAll(selector)].some((element) => {
+    if (element.closest('[hidden], [aria-hidden="true"], [inert]'))
+      return false;
+    if (typeof window === "undefined") return true;
+    const style = window.getComputedStyle(element);
+    return style.display !== "none" && style.visibility !== "hidden";
+  });
 }
 /** Tab may cycle snap choices only while a real placement preview is active. */
 export function tabCyclesTarget(
@@ -99,16 +122,25 @@ export function dispatchShortcut(
   >,
   commands: readonly BoundCommand[],
 ) {
-  if (
-    event.defaultPrevented ||
-    event.isComposing ||
-    isEditingText(event.target) ||
-    (typeof document !== "undefined" &&
-      !!document.querySelector(
-        '[role="dialog"], [role="menu"], [role="listbox"]',
-      ))
-  )
+  if (event.defaultPrevented || event.isComposing || hasOpenShortcutOverlay())
     return false;
+
+  // Escape cancels any unfinished drawing or gesture first. No undo entry is
+  // created, and a subsequent Escape can still return to Select via the local
+  // viewport command. This also works after just the *first* drawing click.
+  if (event.key === "Escape") {
+    const editor = useEditor.getState();
+    if (editor.hasDraft || editor.preview || editor.gestureActive) {
+      event.preventDefault();
+      editor.cancel();
+      return true;
+    }
+  }
+
+  // Typing shortcuts stay disabled in text fields; Escape above is the
+  // exception while an edit is active, including the numeric entry bar.
+  if (isEditingText(event.target)) return false;
+
   const command = commands.find((candidate) =>
     candidate.keys.some(
       (key) =>

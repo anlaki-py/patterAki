@@ -1,6 +1,6 @@
 import { defineCommand } from "./command";
 import { executeEdgeActions } from "./edgeActions";
-import { deleteSelection } from "./selectionActions";
+import { deleteActivePoint, deleteSelection } from "./selectionActions";
 import { useEditor } from "./store";
 import { changeLength } from "../document/operations";
 import {
@@ -95,10 +95,20 @@ export const geometryCommands = {
   delete: defineCommand(
     "delete",
     "Delete selection",
-    () => deleteSelection(useEditor.getState().selected),
-    () =>
-      !useEditor.getState().hasDraft &&
-      useEditor.getState().selected.length > 0,
+    () => {
+      const s = useEditor.getState();
+      if (s.selected.length) deleteSelection(s.selected);
+      else if (s.activePoint) deleteActivePoint(s.activePoint);
+    },
+    () => {
+      const s = useEditor.getState();
+      return (
+        !s.hasDraft &&
+        !s.preview &&
+        !s.gestureActive &&
+        (s.selected.length > 0 || !!s.activePoint)
+      );
+    },
     [{ key: "Delete" }, { key: "Backspace" }],
   ),
   rename: defineCommand<string>(
