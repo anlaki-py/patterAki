@@ -1,3 +1,5 @@
+import { assertValidDocumentEdit } from "../document/contourValidation";
+import { applyDraftTangents } from "../document/curveDraft";
 import { DraftPrecision } from "../ui/DraftPrecision";
 import { DraftOverlay } from "./DraftOverlay";
 import { exactDraftEndpoint, rectangleDimensions } from "./draftInput";
@@ -109,6 +111,15 @@ export function EditorViewport() {
   const annotations = useAnnotationEditor();
   const placement = usePointPlacement(view.scale);
   const [division, setDivision] = useState<DivisionSession | null>(null);
+  const draftTangents = useRef(new Map<number, Vec2>());
+  const draftPress = useRef<{
+    pointer: number;
+    start: Vec2;
+    index: number;
+    points: Vec2[];
+    commit: boolean;
+    closed: boolean;
+  } | null>(null);
   const [draft, setDraft] = useState<Vec2[]>([]);
   const [cursor, setCursor] = useState<CursorSnap>(freeSnap({ x: 0, y: 0 }));
   const cursorRef = useRef<CursorSnap>(cursor);
@@ -206,6 +217,8 @@ export function EditorViewport() {
 
   const reset = () => {
     setDraft([]);
+    draftTangents.current.clear();
+    draftPress.current = null;
     setDrag(null);
     setGuideDrag(null);
     setExact("");
@@ -259,7 +272,16 @@ export function EditorViewport() {
 
   const commitPath = (points: Vec2[], closed = false) => {
     try {
-      s.commit(addPath(s.document, points, closed, createId));
+      s.commit(
+        assertValidDocumentEdit(
+          s.document,
+          applyDraftTangents(
+            addPath(s.document, points, closed, createId),
+            points,
+            draftTangents.current,
+          ),
+        ),
+      );
       reset();
     } catch (e) {
       notifications.show({ color: "red", message: (e as Error).message });
@@ -273,7 +295,11 @@ export function EditorViewport() {
     height,
     factor,
     commitPath,
-    setDraft,
+    setDraft: (points) => {
+      for (const index of draftTangents.current.keys())
+        if (index >= points.length) draftTangents.current.delete(index);
+      setDraft(points);
+    },
     clearExact: () => setExact(""),
   });
 
@@ -713,6 +739,14 @@ export function EditorViewport() {
     }
     if (!origin) {
       setDraft([point]);
+      draftPress.current = {
+        pointer: e.pointerId,
+        start: position(e),
+        index: 0,
+        points: [point],
+        commit: false,
+        closed: false,
+      };
       return;
     }
     if (exact !== "") {
@@ -720,18 +754,38 @@ export function EditorViewport() {
       return;
     }
     if (distance(origin, point) < 1e-9) return;
-    if (s.tool === "line") commitPath([origin, point]);
-    else if (
+    const closed =
+      s.tool === "polyline" &&
       draft.length >= 3 &&
       distance(draft[0], point) <
         (e.pointerType === "touch" ? s.touchRadiusPx : s.mouseRadiusPx) /
-          view.scale
-    )
-      commitPath(draft, true);
-    else setDraft([...draft, point]);
+          view.scale;
+    const points = closed ? draft : [...draft, point];
+    draftPress.current = {
+      pointer: e.pointerId,
+      start: position(e),
+      index: closed ? 0 : points.length - 1,
+      points,
+      commit: s.tool === "line" || closed,
+      closed,
+    };
+    if (!closed) setDraft(points);
   };
 
   const move = (e: CanvasPointer) => {
+    const press = draftPress.current;
+    if (
+      press?.pointer === e.pointerId &&
+      distance(position(e), press.start) * view.scale >= 3
+    ) {
+      const point = position(e);
+      draftTangents.current.set(press.index, {
+        x: point.x - press.start.x,
+        y: point.y - press.start.y,
+      });
+      setDraft([...press.points]);
+      return;
+    }
     lastMove.current = {
       point: position(e),
       pointer: e.pointerId,
@@ -757,7 +811,7 @@ export function EditorViewport() {
       setBypass(e.altKey);
       return;
     }
-    if (curveDrag.move(position(e), e.pointerId)) {
+    if (curveDrag.move(position(e), e.pointerId, e.altKey)) {
       setCursorState(freeSnap(position(e)));
       return;
     }
@@ -821,6 +875,17 @@ export function EditorViewport() {
   );
 
   const up = (e: PointerEvent<SVGSVGElement>) => {
+    const press = draftPress.current;
+    if (press?.pointer === e.pointerId) {
+      draftPress.current = null;
+      const end = position(e);
+      if (distance(end, press.start) * view.scale >= 3)
+        draftTangents.current.set(press.index, {
+          x: end.x - press.start.x,
+          y: end.y - press.start.y,
+        });
+      if (press.commit) commitPath(press.points, press.closed);
+    }
     finishGuideDrag(e);
     selectionDrag.finish(position(e), e.pointerId, {
       shiftKey: e.shiftKey,
@@ -1125,6 +1190,7 @@ export function EditorViewport() {
                   selectedIds={s.selected}
                   scale={view.scale}
                   showPoints={s.tool === "point"}
+                  activePoint={s.activePoint}
                   interactivePoints={s.tool === "select" || s.tool === "curve"}
                   showHandles={s.tool === "curve"}
                 />
@@ -1135,6 +1201,7 @@ export function EditorViewport() {
                 />
               </g>
               <DraftOverlay
+                tangents={draftTangents.current}
                 draft={draft}
                 end={draftEnd}
                 rectangle={s.tool === "rectangle" ? rectangleSize : undefined}

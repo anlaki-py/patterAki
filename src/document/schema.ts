@@ -198,58 +198,77 @@ function validPieceContour(
   });
   return validateContourSegments(segments).valid;
 }
-const currentSchema = z
+function validateCurrentDocument(
+  doc: Omit<z.infer<typeof version4Schema>, "schemaVersion"> & {
+    pieces: Record<string, PatternPiece>;
+  },
+  ctx: z.RefinementCtx,
+) {
+  validateSegments(doc, ctx);
+  for (const [id, mark] of Object.entries(doc.annotations)) {
+    if (
+      id !== mark.id ||
+      Object.hasOwn(doc.segments, id) ||
+      !annotationInRange(mark)
+    )
+      ctx.addIssue({
+        code: "custom",
+        message: `Invalid or duplicate annotation ID ${id}`,
+      });
+  }
+  for (const [id, guide] of Object.entries(doc.guides)) {
+    if (
+      id !== guide.id ||
+      Object.hasOwn(doc.segments, id) ||
+      Object.hasOwn(doc.annotations, id)
+    )
+      ctx.addIssue({
+        code: "custom",
+        message: `Invalid or duplicate guide ID ${id}`,
+      });
+  }
+  const owned = new Set<string>();
+  for (const [id, piece] of Object.entries(doc.pieces)) {
+    const cycle = pieceCycle(doc, piece.rootSegmentId);
+    if (
+      id !== piece.id ||
+      Object.hasOwn(doc.segments, id) ||
+      Object.hasOwn(doc.annotations, id) ||
+      Object.hasOwn(doc.guides, id) ||
+      !cycle ||
+      !validPieceContour(doc, cycle) ||
+      cycle.some((edgeId) => owned.has(edgeId))
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        message: `Invalid or overlapping pattern piece ${id}`,
+      });
+      continue;
+    }
+    cycle.forEach((edgeId) => owned.add(edgeId));
+  }
+}
+const version5Schema = z
   .object({
     ...version4Schema.shape,
     schemaVersion: z.literal(5),
     pieces: z.record(z.string(), patternPieceSchema),
   })
   .strict()
-  .superRefine((doc, ctx) => {
-    validateSegments(doc, ctx);
-    for (const [id, mark] of Object.entries(doc.annotations)) {
-      if (
-        id !== mark.id ||
-        Object.hasOwn(doc.segments, id) ||
-        !annotationInRange(mark)
-      )
-        ctx.addIssue({
-          code: "custom",
-          message: `Invalid or duplicate annotation ID ${id}`,
-        });
-    }
-    for (const [id, guide] of Object.entries(doc.guides)) {
-      if (
-        id !== guide.id ||
-        Object.hasOwn(doc.segments, id) ||
-        Object.hasOwn(doc.annotations, id)
-      )
-        ctx.addIssue({
-          code: "custom",
-          message: `Invalid or duplicate guide ID ${id}`,
-        });
-    }
-    const owned = new Set<string>();
-    for (const [id, piece] of Object.entries(doc.pieces)) {
-      const cycle = pieceCycle(doc, piece.rootSegmentId);
-      if (
-        id !== piece.id ||
-        Object.hasOwn(doc.segments, id) ||
-        Object.hasOwn(doc.annotations, id) ||
-        Object.hasOwn(doc.guides, id) ||
-        !cycle ||
-        !validPieceContour(doc, cycle) ||
-        cycle.some((edgeId) => owned.has(edgeId))
-      ) {
-        ctx.addIssue({
-          code: "custom",
-          message: `Invalid or overlapping pattern piece ${id}`,
-        });
-        continue;
-      }
-      cycle.forEach((edgeId) => owned.add(edgeId));
-    }
-  });
+  .superRefine(validateCurrentDocument);
+
+export const pointModeSchema = z.enum(["corner", "smooth", "symmetric"]);
+const currentSchema = z
+  .object({
+    ...version5Schema.shape,
+    schemaVersion: z.literal(6),
+    points: z.record(
+      z.string(),
+      point.extend({ mode: pointModeSchema.optional() }),
+    ),
+  })
+  .strict()
+  .superRefine(validateCurrentDocument);
 
 // Validate each historical representation before migration: malformed v1–v4
 // must not be silently accepted, and newer unknown versions are rejected.
@@ -277,13 +296,18 @@ export const documentSchema = z.preprocess((input) => {
     if (Object.hasOwn(candidate, "pieces")) return input;
     const legacy = version4Schema.safeParse(candidate);
     if (!legacy.success) return input;
-    return { ...legacy.data, schemaVersion: 5, pieces: {} };
+    candidate = { ...legacy.data, schemaVersion: 5, pieces: {} };
+  }
+  if (candidate.schemaVersion === 5) {
+    const legacy = version5Schema.safeParse(candidate);
+    if (!legacy.success) return input;
+    return { ...legacy.data, schemaVersion: 6 };
   }
   return candidate;
 }, currentSchema);
 export type PatternDocument = z.infer<typeof documentSchema>;
 export const emptyDocument = (id: string): PatternDocument => ({
-  schemaVersion: 5,
+  schemaVersion: 6,
   annotations: {},
   guides: {},
   pieces: {},

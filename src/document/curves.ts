@@ -48,13 +48,45 @@ export function moveHandle(
   id: string,
   handle: "control1" | "control2",
   position: Vec2,
+  decouple = false,
 ): PatternDocument {
   const next = convertToCurve(doc, id),
     edge = next.segments[id];
-  return {
-    ...next,
-    segments: { ...next.segments, [id]: { ...edge, [handle]: position } },
-  };
+  if (edge.kind !== "cubic") return doc;
+  const pointId = handle === "control1" ? edge.from : edge.to;
+  const anchor = doc.points[pointId];
+  const mode = anchor.mode ?? "corner";
+  const segments = { ...next.segments, [id]: { ...edge, [handle]: position } };
+  if (!decouple && mode !== "corner") {
+    const dx = position.x - anchor.x,
+      dy = position.y - anchor.y;
+    const length = Math.hypot(dx, dy);
+    for (const other of Object.values(next.segments)) {
+      if (other.id === id || (other.from !== pointId && other.to !== pointId))
+        continue;
+      const key = other.from === pointId ? "control1" : "control2";
+      const cubic = asCubic(next, other);
+      const old = cubic[key === "control1" ? 1 : 2];
+      const size =
+        mode === "symmetric"
+          ? length
+          : Math.hypot(old.x - anchor.x, old.y - anchor.y);
+      segments[other.id] = {
+        ...other,
+        kind: "cubic",
+        control1: cubic[1],
+        control2: cubic[2],
+        [key]:
+          length > 1e-9
+            ? {
+                x: anchor.x - (dx * size) / length,
+                y: anchor.y - (dy * size) / length,
+              }
+            : { x: anchor.x, y: anchor.y },
+      };
+    }
+  }
+  return { ...next, segments };
 }
 export function moveVertex(
   doc: PatternDocument,
@@ -77,7 +109,11 @@ export function moveVertex(
         : edge,
     ]),
   );
-  return { ...doc, points: { ...doc.points, [id]: position }, segments };
+  return {
+    ...doc,
+    points: { ...doc.points, [id]: { ...old, ...position } },
+    segments,
+  };
 }
 export function straightenCurve(
   doc: PatternDocument,
@@ -88,4 +124,31 @@ export function straightenCurve(
     ...doc,
     segments: { ...doc.segments, [id]: { id, kind: "line", from, to } },
   };
+}
+
+export function setPointMode(
+  doc: PatternDocument,
+  id: string,
+  mode: "corner" | "smooth" | "symmetric",
+): PatternDocument {
+  if (!doc.points[id]) throw new Error("Select a point first.");
+  const adjacent = Object.values(doc.segments).filter(
+    (e) => e.from === id || e.to === id,
+  );
+  if (mode !== "corner" && adjacent.length > 2)
+    throw new Error("Linked tangents require at most two adjacent edges.");
+  const next = {
+    ...doc,
+    points: { ...doc.points, [id]: { ...doc.points[id], mode } },
+  };
+  if (mode === "corner" || !adjacent.length) return next;
+  const edge = adjacent[0],
+    handle = edge.from === id ? "control1" : "control2";
+  const cubic = asCubic(next, edge);
+  return moveHandle(
+    next,
+    edge.id,
+    handle,
+    cubic[handle === "control1" ? 1 : 2],
+  );
 }

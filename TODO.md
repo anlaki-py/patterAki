@@ -78,11 +78,13 @@ Implementation and automated verification completed 2026-11-11. Unit coverage in
 
 ### M1.3 Curves that are easy to edit
 
-- [ ] Add point modes `Corner / Smooth / Symmetric`, with linked tangents where appropriate. `Alt` can temporarily decouple handles; existing independent-handle behavior remains available.
-- [ ] Support creating a curved point by dragging during line/polygon creation; preserve the current direct drag-to-bend route.
-- [ ] Keep handles focused on the active point; provide `Smooth point` and `Convert to straight` commands in context/inspector.
-- [ ] Show arc length vs chord clearly and ensure any numeric curve edit labels the exact quantity it changes. Do **not** claim arc-length editing if only the chord is modified.
-- [ ] Warn if a bend makes a closed contour invalid or later makes a seam offset impossible. Cancel must restore original geometry and one bend must create one history entry.
+- [x] Add point modes `Corner / Smooth / Symmetric`, with linked tangents where appropriate. `Alt` can temporarily decouple handles; existing independent-handle behavior remains available.
+- [x] Support creating a curved point by dragging during line/polygon creation; preserve the current direct drag-to-bend route.
+- [x] Keep handles focused on the active point; provide `Smooth point` and `Convert to straight` commands in context/inspector.
+- [x] Show arc length vs chord clearly and ensure any numeric curve edit labels the exact quantity it changes. Do **not** claim arc-length editing if only the chord is modified.
+- [x] Warn if a bend makes a closed contour invalid or later makes a seam offset impossible. Cancel must restore original geometry and one bend must create one history entry.
+
+Implementation: schema v6 persists point modes with validated v1–v5 migration. Closed-contour rejection is active; offset feasibility remains unavailable until M3 and is explicitly identified in Properties. Browser acceptance remains pending: drag-created endpoints and closing points, active-point handles, Alt decoupling, Escape/pointer cancellation, undo/redo, and touch at 25%–400% zoom.
 
 **M1 gate:** at any zoom, users can draw a numeric 120 mm line, change it to 150 mm with each anchor, split a cubic by arc distance without changing its shape, snap without jitter, and undo each completed gesture in exactly one step.
 

@@ -1,3 +1,4 @@
+import { setPointMode } from "../document/curves";
 import { parseLength } from "../document/lengthInput";
 import { defineCommand } from "./command";
 import { executeEdgeActions } from "./edgeActions";
@@ -67,8 +68,22 @@ const singleLine = () => {
   );
 };
 export const geometryCommands = {
+  pointMode: defineCommand<"corner" | "smooth" | "symmetric">(
+    "point.mode",
+    "Point mode",
+    (mode) => {
+      const s = useEditor.getState();
+      s.commit(
+        assertValidDocumentEdit(
+          s.document,
+          setPointMode(s.document, s.activePoint!, mode),
+        ),
+      );
+    },
+    () => !!useEditor.getState().activePoint && !useEditor.getState().preview,
+  ),
   curve: edgeCommand("curve", "Convert to curve"),
-  reset: edgeCommand("reset", "Reset curve / remove handles"),
+  reset: edgeCommand("reset", "Convert to straight / remove handles"),
   intersections: edgeCommand("intersections", "Create points at intersections"),
   createPiece: defineCommand<string>(
     "piece.create-from-contour",

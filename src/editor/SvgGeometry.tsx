@@ -9,7 +9,9 @@ export function SvgGeometry({
   showPoints = false,
   interactivePoints,
   showHandles = false,
+  activePoint,
 }: {
+  activePoint?: string | null;
   doc: PatternDocument;
   selectedIds: string[];
   scale: number;
@@ -82,7 +84,11 @@ export function SvgGeometry({
         );
       })}
       {selected && (showHandles || selected.kind === "cubic") && (
-        <CurveHandles doc={doc} pointIds={selectedPointIds} scale={scale} />
+        <CurveHandles
+          doc={doc}
+          pointIds={activePoint ? [activePoint] : [selected.from]}
+          scale={scale}
+        />
       )}
     </>
   );

@@ -1,3 +1,4 @@
+import { distance } from "../geometry/line";
 import type { DivisionMode } from "../document/divisions";
 import {
   cloneElement,
@@ -191,6 +192,22 @@ export function CanvasContextMenu({
           })}
         </Menu.ContextMenu>
         <Menu.Dropdown>
+          {edge && target?.kind === "edge" && (
+            <Menu.Item
+              onClick={() => {
+                useEditor.setState({
+                  activePoint:
+                    distance(target.point, s.document.points[edge.from]) <=
+                    distance(target.point, s.document.points[edge.to])
+                      ? edge.from
+                      : edge.to,
+                });
+                report(commands.pointMode.bind("smooth")).run();
+              }}
+            >
+              Smooth point
+            </Menu.Item>
+          )}
           {edge && target?.kind === "edge" && (
             <EdgeMenuItems
               curved={curved}

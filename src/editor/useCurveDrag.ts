@@ -40,16 +40,20 @@ export function useCurveDrag() {
     };
     useEditor.setState({
       selected: [edgeId],
+      activePoint:
+        handle === "control2"
+          ? s.document.segments[edgeId].to
+          : s.document.segments[edgeId].from,
       preview: convertToCurve(s.document, edgeId),
       previewIssue: null,
     });
     return true;
   };
-  const move = (point: Vec2, pointer: number) => {
+  const move = (point: Vec2, pointer: number, alt = false) => {
     const d = drag.current;
     if (!d || d.pointer !== pointer) return false;
     const preview = d.handle
-      ? moveHandle(d.base, d.edgeId, d.handle, point)
+      ? moveHandle(d.base, d.edgeId, d.handle, point, alt)
       : bendCurve(d.base, d.edgeId, d.t, {
           x: point.x - d.start.x,
           y: point.y - d.start.y,

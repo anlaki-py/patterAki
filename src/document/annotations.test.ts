@@ -175,7 +175,7 @@ describe("version migrations", () => {
     expect(documentSchema.safeParse({ ...legacyV4, pieces: {} }).success).toBe(
       false,
     );
-    expect(documentSchema.safeParse({ ...doc, schemaVersion: 6 }).success).toBe(
+    expect(documentSchema.safeParse({ ...doc, schemaVersion: 7 }).success).toBe(
       false,
     );
     // Even an empty extra field is unsupported in historical formats.
