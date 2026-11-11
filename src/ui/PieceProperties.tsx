@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import {
   Button,
   Group,
@@ -12,15 +12,12 @@ import {
 } from "@mantine/core";
 import { useEditor } from "../editor/store";
 import { commands } from "../editor/commands";
-import {
-  selectedPieceIds,
-  previewPieceRotation,
-} from "../editor/pieceCommands";
+import { selectedPieceIds } from "../editor/pieceCommands";
 import { pieceBounds } from "../document/pieceTransforms";
 import { pieceForItem } from "../document/pieceAccess";
 import { formatLength, type PatternPiece } from "../document/schema";
 import { commandProps, notifyCommand } from "./CommandControls";
-import { DraggableModal } from "./DraggableModal";
+import { PieceActionsMenu } from "./PieceActions";
 
 function PieceDetails({ piece }: { piece: PatternPiece }) {
   const s = useEditor();
@@ -125,50 +122,20 @@ function PieceDetails({ piece }: { piece: PatternPiece }) {
 export function PieceProperties() {
   const s = useEditor(),
     ids = selectedPieceIds();
-  const parent = s.selected.length
-    ? pieceForItem(s.document, s.selected[0])
-    : s.activePoint
-      ? pieceForItem(s.document, s.activePoint)
+  const parent = s.activePoint
+    ? pieceForItem(s.document, s.activePoint)
+    : s.selected.length
+      ? pieceForItem(s.document, s.selected[0])
       : undefined;
   const piece = ids.length === 1 ? s.document.pieces[ids[0]] : parent;
-  const rotating = useRef(false);
-  useEffect(
-    () => () => {
-      if (rotating.current) useEditor.getState().cancel();
-    },
-    [],
-  );
   const [parentId, setParentId] = useState<string | null>(null);
-  const [rotate, setRotate] = useState(false),
-    [degrees, setDegrees] = useState<string | number>(0),
-    [error, setError] = useState("");
-  const preview = (v: string | number) => {
-    setDegrees(v);
-    try {
-      if (v === "") throw new Error("Enter a rotation angle.");
-      previewPieceRotation(Number(v));
-      setError("");
-    } catch (e) {
-      useEditor.setState({ preview: null });
-      setError((e as Error).message);
-    }
-  };
-  const applyRotation = () => {
-    const state = useEditor.getState();
-    if (!state.preview || error) return;
-    try {
-      state.commit(state.preview);
-      rotating.current = false;
-      setRotate(false);
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  };
+
   return (
     <Stack gap="xs">
       <Text fw={600} size="sm">
         Pattern pieces
       </Text>
+      <PieceActionsMenu />
       {piece && (
         <PieceDetails key={`${piece.id}-${s.revision}`} piece={piece} />
       )}
@@ -190,45 +157,6 @@ export function PieceProperties() {
         >
           Attach selected loose path
         </Button>
-      )}
-      {!!ids.length && (
-        <>
-          <Button {...commandProps(commands.editPiece.bind())}>
-            Edit points · E
-          </Button>
-          <Button
-            variant="default"
-            disabled={!commands.duplicatePiece.enabled()}
-            onClick={() => {
-              s.cancel();
-              rotating.current = true;
-              setRotate(true);
-              preview(0);
-            }}
-          >
-            Rotate selected pieces…
-          </Button>
-          <Button
-            variant="default"
-            {...commandProps(notifyCommand(commands.duplicatePiece.bind()))}
-          >
-            Duplicate selected pieces
-          </Button>
-          <Group grow>
-            <Button
-              variant="default"
-              {...commandProps(notifyCommand(commands.mirrorPiece.bind("x")))}
-            >
-              Mirror left/right
-            </Button>
-            <Button
-              variant="default"
-              {...commandProps(notifyCommand(commands.mirrorPiece.bind("y")))}
-            >
-              Mirror top/bottom
-            </Button>
-          </Group>
-        </>
       )}
       {Object.values(s.document.pieces).map((p) => (
         <Stack gap={4} key={p.id}>
@@ -268,51 +196,6 @@ export function PieceProperties() {
           </Group>
         </Stack>
       ))}
-      {rotate && (
-        <DraggableModal
-          onClose={() => {
-            s.cancel();
-            rotating.current = false;
-            setRotate(false);
-          }}
-          title="Rotate selected pieces"
-        >
-          <Stack>
-            <NumberInput
-              label="Clockwise rotation in degrees"
-              value={degrees}
-              onChange={preview}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  applyRotation();
-                }
-              }}
-              error={error}
-              autoFocus
-            />
-            <Text size="sm">
-              Rotate together around the selection center. Pattern dimensions
-              stay unchanged.
-            </Text>
-            <Group>
-              <Button disabled={!s.preview || !!error} onClick={applyRotation}>
-                Apply rotation
-              </Button>
-              <Button
-                variant="default"
-                onClick={() => {
-                  s.cancel();
-                  rotating.current = false;
-                  setRotate(false);
-                }}
-              >
-                Cancel
-              </Button>
-            </Group>
-          </Stack>
-        </DraggableModal>
-      )}
     </Stack>
   );
 }

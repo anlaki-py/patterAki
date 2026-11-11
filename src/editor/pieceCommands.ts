@@ -1,3 +1,4 @@
+import { pieceForItem } from "../document/pieceAccess";
 import { attachInternalPath } from "../document/piecePathsEdit";
 import { defineCommand } from "./command";
 import { createId } from "./ids";
@@ -19,13 +20,25 @@ export function selectedPieceIds() {
     )
     .map((p) => p.id);
 }
+/** Piece actions can target the parent of selected geometry without treating
+ * an unconverted drafting path as a piece. */
+export function pieceActionIds() {
+  const s = useEditor.getState(),
+    whole = selectedPieceIds();
+  if (whole.length) return whole;
+  const parent = pieceForItem(s.document, s.activePoint ?? s.selected[0] ?? "");
+  return parent &&
+    s.selected.every((id) => pieceForItem(s.document, id)?.id === parent.id)
+    ? [parent.id]
+    : [];
+}
 const idle = () => {
   const s = useEditor.getState();
   return !s.preview && !s.hasDraft && !s.gestureActive;
 };
-const transformEnabled = () => {
+export const pieceTransformsEnabled = () => {
   const s = useEditor.getState(),
-    ids = selectedPieceIds();
+    ids = pieceActionIds();
   return (
     idle() &&
     ids.length > 0 &&
@@ -36,7 +49,7 @@ const transformEnabled = () => {
 };
 export function previewPieceRotation(degrees: number) {
   const s = useEditor.getState(),
-    ids = selectedPieceIds(),
+    ids = pieceActionIds(),
     bounds = pieceBounds(s.document, ids);
   const pivot = {
     x: (bounds.min.x + bounds.max.x) / 2,
@@ -45,9 +58,55 @@ export function previewPieceRotation(degrees: number) {
   useEditor.setState({
     preview: transformPieces(s.document, ids, rotationAround(degrees, pivot)),
     previewIssue: null,
+    selected: ids.flatMap((id) =>
+      pieceEdges(s.document, s.document.pieces[id]),
+    ),
+    activePoint: null,
+    editPieceId: null,
   });
 }
 export const pieceCommands = {
+  exitPieceEdit: defineCommand(
+    "piece.exit-edit",
+    "Select pieces",
+    () => {
+      const s = useEditor.getState(),
+        piece = s.editPieceId ? s.document.pieces[s.editPieceId] : undefined;
+      s.cancel();
+      useEditor.setState({
+        editPieceId: null,
+        selected: piece ? pieceEdges(s.document, piece) : [],
+        activePoint: null,
+      });
+    },
+    () => !!useEditor.getState().editPieceId,
+  ),
+  setSelectedPieceState: defineCommand<
+    Partial<Pick<PatternPiece, "visible" | "locked">>
+  >(
+    "piece.set-selection-state",
+    "Update selected pieces",
+    (patch) => {
+      const s = useEditor.getState(),
+        ids = new Set(pieceActionIds());
+      s.commit({
+        ...s.document,
+        pieces: Object.fromEntries(
+          Object.entries(s.document.pieces).map(([id, p]) => [
+            id,
+            ids.has(id) ? { ...p, ...patch } : p,
+          ]),
+        ),
+      });
+      if (patch.visible === false || patch.locked === true)
+        useEditor.setState({
+          selected: [],
+          activePoint: null,
+          editPieceId: null,
+        });
+    },
+    () => idle() && pieceActionIds().length > 0,
+  ),
   attachInternalPath: defineCommand<string>(
     "piece.attach-internal",
     "Attach selected loose path",
@@ -65,7 +124,7 @@ export const pieceCommands = {
     "Edit points",
     () => {
       const s = useEditor.getState(),
-        id = selectedPieceIds()[0];
+        id = pieceActionIds()[0];
       s.cancel();
       useEditor.setState({
         editPieceId: id,
@@ -74,7 +133,7 @@ export const pieceCommands = {
         activePoint: null,
       });
     },
-    () => transformEnabled() && selectedPieceIds().length === 1,
+    () => pieceTransformsEnabled() && pieceActionIds().length === 1,
     [{ key: "e" }],
   ),
   selectPiece: defineCommand<string>(
@@ -123,7 +182,7 @@ export const pieceCommands = {
     "Duplicate pieces",
     () => {
       const s = useEditor.getState(),
-        result = duplicatePieces(s.document, selectedPieceIds(), createId, {
+        result = duplicatePieces(s.document, pieceActionIds(), createId, {
           x: 10,
           y: 10,
         });
@@ -136,14 +195,14 @@ export const pieceCommands = {
         activePoint: null,
       });
     },
-    transformEnabled,
+    pieceTransformsEnabled,
   ),
   mirrorPiece: defineCommand<"x" | "y">(
     "piece.mirror",
     "Mirror pieces",
     (axis) => {
       const s = useEditor.getState(),
-        ids = selectedPieceIds(),
+        ids = pieceActionIds(),
         bounds = pieceBounds(s.document, ids);
       s.commit(
         transformPieces(
@@ -156,6 +215,6 @@ export const pieceCommands = {
         ),
       );
     },
-    transformEnabled,
+    pieceTransformsEnabled,
   ),
 };

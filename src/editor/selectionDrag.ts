@@ -1,4 +1,4 @@
-import { clickSelection } from "./selection";
+import { selectionForEdgeHit } from "./selection";
 import { itemEditable } from "../document/pieceAccess";
 import { itemsInBox, translateSelection } from "../document/selection";
 import type { PatternDocument } from "../document/schema";
@@ -6,7 +6,6 @@ import { selectionBounds, type Bounds } from "../geometry/bounds";
 import { distance, type Vec2 } from "../geometry/line";
 import type { SnapKind } from "../geometry/snapping";
 import { constrainToAxis, movementAxis, type MovementAxis } from "./movement";
-import { clickPieceSelection } from "../document/pieces";
 import { useEditor } from "./store";
 
 export type SelectionDragInfo = {
@@ -48,15 +47,21 @@ export function beginSelectionDrag(options: {
   const initial = useEditor.getState();
   initial.cancel();
   const baseSelection = initial.selected;
-  const selected = itemId
-    ? initial.editPieceId
-      ? clickSelection(baseSelection, itemId, additive)
-      : clickPieceSelection(initial.document, baseSelection, itemId, additive)
-    : additive
-      ? baseSelection
-      : [];
+  const selection = itemId
+    ? selectionForEdgeHit(
+        initial.document,
+        baseSelection,
+        itemId,
+        additive,
+        initial.editPieceId,
+      )
+    : {
+        selected: additive ? baseSelection : [],
+        editPieceId: initial.editPieceId,
+      };
+  const { selected } = selection;
   useEditor.setState({
-    selected,
+    ...selection,
     selectedGuide: null,
     activePoint: null,
   });
@@ -151,7 +156,7 @@ export function beginSelectionDrag(options: {
       if (!move(point, pointerId, modifiers)) return false;
       ended = true;
       if (box) {
-        const hits = itemsInBox(snapshot.document, box);
+        const hits = itemsInBox(snapshot.document, box, snapshot.editPieceId);
         useEditor.setState({
           selected: additive ? [...new Set([...baseSelection, ...hits])] : hits,
         });

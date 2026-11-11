@@ -1,3 +1,4 @@
+import { pieceEdges } from "../document/pieces";
 import { pieceCommands } from "./pieceCommands";
 import { itemEditable } from "../document/pieceAccess";
 import { defineCommand, localCommand, type Shortcut } from "./command";
@@ -116,12 +117,15 @@ export const commands = {
       s.cancel();
       useEditor.setState({
         tool: "select",
-        selected: [
-          ...Object.keys(s.document.segments).filter((id) =>
-            itemEditable(s.document, id),
-          ),
-          ...Object.keys(s.document.annotations),
-        ],
+        selected:
+          s.editPieceId && s.document.pieces[s.editPieceId]
+            ? pieceEdges(s.document, s.document.pieces[s.editPieceId])
+            : [
+                ...Object.keys(s.document.segments).filter((id) =>
+                  itemEditable(s.document, id),
+                ),
+                ...Object.keys(s.document.annotations),
+              ],
       });
     },
     () => {
@@ -159,6 +163,12 @@ export const commands = {
   resetLayout: localCommand("view.reset-layout", "Reset workspace layout"),
   help: localCommand("help.controls", "Drafting help"),
   shortcutReference: localCommand("help.shortcuts", "Keyboard shortcuts"),
+  rotatePiece: localCommand("piece.rotate-dialog", "Rotate selected pieces…"),
+  renamePiece: localCommand("piece.rename-dialog", "Rename piece…"),
+  createPieceDialog: localCommand(
+    "piece.create-dialog",
+    "Create piece from closed path…",
+  ),
   fitSelection: localCommand("view.fit-selection", "Fit selection", [
     { key: "f" },
   ]),

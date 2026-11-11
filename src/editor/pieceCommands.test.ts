@@ -183,3 +183,101 @@ it("fit-selection excludes distant loose geometry and viewport changes never alt
   expect(view.scale).toBeGreaterThan(2);
   expect(doc.points).toMatchObject(original.points);
 });
+
+it("piece transforms remain enabled when a child edge is selected, and rotation targets the whole parent", () => {
+  commands.editPiece.run();
+  expect(useEditor.getState().selected).toHaveLength(1);
+  expect(commands.duplicatePiece.enabled()).toBe(true);
+  expect(commands.mirrorPiece.enabled("x")).toBe(true);
+  const doc = useEditor.getState().document;
+  previewPieceRotation(90);
+  expect(useEditor.getState().selected).toEqual(
+    pieceEdges(doc, doc.pieces.piece),
+  );
+  expect(useEditor.getState().activePoint).toBeNull();
+  expect(useEditor.getState().editPieceId).toBeNull();
+  expect(useEditor.getState().document).toBe(doc);
+});
+it("Edit points box selection stays on individual edges of its parent, and Select pieces exits explicitly", () => {
+  commands.editPiece.run();
+  const doc = useEditor.getState().document;
+  const box = beginSelectionDrag({
+    point: { x: 95, y: 30 },
+    pointer: 91,
+    scale: 2,
+    additive: false,
+  });
+  box.finish({ x: 105, y: 50 }, 91);
+  expect(useEditor.getState().selected).toHaveLength(1);
+  expect(useEditor.getState().editPieceId).toBe("piece");
+  expect(useEditor.getState().document).toBe(doc);
+  commands.exitPieceEdit.run();
+  expect(useEditor.getState().editPieceId).toBeNull();
+  expect(useEditor.getState().selected).toEqual(
+    pieceEdges(doc, doc.pieces.piece),
+  );
+});
+it("selecting a different piece exits the previous parent's Edit points mode", () => {
+  commands.duplicatePiece.run();
+  const doc = useEditor.getState().document,
+    copyId = selectedPieceIds()[0];
+  commands.selectPiece.run("piece");
+  commands.editPiece.run();
+  const first = doc.pieces[copyId].rootSegmentId;
+  const click = beginSelectionDrag({
+    itemId: first,
+    point: { x: 60, y: 10 },
+    pointer: 92,
+    scale: 2,
+    additive: false,
+  });
+  click.finish({ x: 60, y: 10 }, 92);
+  expect(useEditor.getState().editPieceId).toBeNull();
+  expect(useEditor.getState().selected).toEqual(
+    pieceEdges(doc, doc.pieces[copyId]),
+  );
+});
+it("multi-piece lock/hide is one undo step and preserves every point", () => {
+  commands.duplicatePiece.run();
+  commands.selectAll.run();
+  const before = useEditor.getState().document,
+    past = useEditor.getState().past.length;
+  commands.setSelectedPieceState.run({ visible: false });
+  expect(
+    Object.values(useEditor.getState().document.pieces).every(
+      (p) => !p.visible,
+    ),
+  ).toBe(true);
+  expect(useEditor.getState().document.points).toEqual(before.points);
+  expect(useEditor.getState().past).toHaveLength(past + 1);
+  useEditor.getState().undo();
+  expect(useEditor.getState().document).toEqual(before);
+});
+it("named Create piece is explicit, one undo step, and leaves loose paths unchanged", () => {
+  let count = 0;
+  const doc = addPath(
+    emptyDocument("new-piece"),
+    [
+      { x: 0, y: 0 },
+      { x: 100, y: 0 },
+      { x: 100, y: 80 },
+      { x: 0, y: 80 },
+    ],
+    true,
+    () => `create-${++count}`,
+  );
+  useEditor.getState().load(doc);
+  const first = Object.keys(doc.segments)[0];
+  useEditor.setState({ selected: [first], tool: "select" });
+  expect(commands.createPiece.enabled({ edgeId: first, name: "Front" })).toBe(
+    true,
+  );
+  commands.createPiece.run({ edgeId: first, name: "Front" });
+  expect(Object.values(useEditor.getState().document.pieces)[0].name).toBe(
+    "Front",
+  );
+  expect(useEditor.getState().document.points).toEqual(doc.points);
+  expect(useEditor.getState().past).toHaveLength(1);
+  useEditor.getState().undo();
+  expect(useEditor.getState().document).toEqual(doc);
+});

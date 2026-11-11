@@ -1,3 +1,5 @@
+import { pieceForEdge } from "../document/pieces";
+import { usePieceActions } from "../ui/PieceActions";
 import { distance } from "../geometry/line";
 import type { DivisionMode } from "../document/divisions";
 import {
@@ -18,8 +20,7 @@ import { openLengthEditor } from "../ui/EdgeLengthDialog";
 import { commands } from "./commands";
 import type { BoundCommand } from "./command";
 import { CommandMenuItem, notifyCommand } from "../ui/CommandControls";
-import { contextSelection } from "./selection";
-import { expandPieceSelection } from "../document/pieces";
+import { contextSelection, selectionForEdgeHit } from "./selection";
 import { contextTarget, type ContextHit } from "./contextTarget";
 import { useEditor } from "./store";
 type Target = ContextHit & {
@@ -50,6 +51,11 @@ export function CanvasContextMenu({
   const touchPoint = useRef<Vec2 | null>(null);
   const [target, setTarget] = useState<Target | null>(null);
   const [opened, setOpened] = useState(false);
+  const [piecesOpened, setPiecesOpened] = useState(false);
+  const pieces = usePieceActions(() => {
+    setOpened(false);
+    setPiecesOpened(false);
+  });
   const valid =
     target &&
     target.revision === s.revision &&
@@ -58,6 +64,8 @@ export function CanvasContextMenu({
     valid && target.kind === "edge"
       ? s.document.segments[target.id]
       : undefined;
+  const pieceContext =
+    !!edge && !!pieceForEdge(s.document, edge.id) && !s.editPieceId;
   const selectedEdge = s.selected
     .map((id) => s.document.segments[id])
     .find(Boolean);
@@ -69,13 +77,20 @@ export function CanvasContextMenu({
   const activate = (hit: ContextHit, point: Vec2): Target => {
     s.cancel();
     if (hit.kind !== "empty") {
-      const nextSelection = contextSelection(s.selected, hit.id);
-      useEditor.setState({
-        selected:
-          hit.kind === "edge" && !s.editPieceId
-            ? expandPieceSelection(s.document, nextSelection)
-            : nextSelection,
-      });
+      useEditor.setState(
+        hit.kind === "edge"
+          ? selectionForEdgeHit(
+              s.document,
+              s.selected,
+              hit.id,
+              false,
+              s.editPieceId,
+            )
+          : {
+              selected: contextSelection(s.selected, hit.id),
+              editPieceId: null,
+            },
+      );
     }
     const state = useEditor.getState();
     const next = {
@@ -124,7 +139,6 @@ export function CanvasContextMenu({
         },
       }),
     intersections: report(commands.intersections.bind()),
-    piece: report(commands.createPiece.bind(target.id)),
     curve: report(commands.curve.bind()),
     reset: report(commands.reset.bind()),
     delete: report(commands.delete.bind()),
@@ -192,7 +206,7 @@ export function CanvasContextMenu({
           })}
         </Menu.ContextMenu>
         <Menu.Dropdown>
-          {edge && target?.kind === "edge" && (
+          {edge && !pieceContext && target?.kind === "edge" && (
             <Menu.Item
               onClick={() => {
                 useEditor.setState({
@@ -210,24 +224,23 @@ export function CanvasContextMenu({
           )}
           {edge && target?.kind === "edge" && (
             <>
-              <CommandMenuItem command={report(commands.editPiece.bind())} />
-              <CommandMenuItem
-                command={report(commands.duplicatePiece.bind())}
-              />
-              <CommandMenuItem
-                command={report(commands.mirrorPiece.bind("x"))}
-              />
+              {pieces.items}
+              <Menu.Divider />
             </>
           )}
-          {edge && target?.kind === "edge" && (
+          {edge && !pieceContext && target?.kind === "edge" && (
             <EdgeMenuItems
               curved={curved}
               count={s.selected.length}
               actions={edgeCommands(target)}
             />
           )}
-          {edge && target?.kind === "edge" && (
-            <CommandMenuItem command={edgeCommands(target).piece} />
+
+          {pieceContext && (
+            <CommandMenuItem
+              command={report(commands.delete.bind())}
+              color="red"
+            />
           )}
           {target?.kind === "annotation" && (
             <>
@@ -250,7 +263,20 @@ export function CanvasContextMenu({
           )}
         </Menu.Dropdown>
       </Menu>
+      {pieces.dialogs}
       <Group p="xs" gap="xs">
+        <Menu
+          opened={piecesOpened}
+          onChange={setPiecesOpened}
+          width={300}
+          position="top-start"
+          trapFocus
+        >
+          <Menu.Target>
+            <Button variant="default">Piece actions</Button>
+          </Menu.Target>
+          <Menu.Dropdown>{pieces.items}</Menu.Dropdown>
+        </Menu>
         <Menu width={280} position="top-start" trapFocus>
           <Menu.Target>
             <Button
@@ -275,9 +301,7 @@ export function CanvasContextMenu({
                     cancelVersion: s.cancelVersion,
                   })}
                 />
-                <CommandMenuItem
-                  command={commands.createPiece.bind(selectedEdge.id)}
-                />
+                <CommandMenuItem command={pieces.create} />
               </>
             )}
           </Menu.Dropdown>
@@ -307,9 +331,7 @@ export function CanvasContextMenu({
           </Menu.Dropdown>
         </Menu>
         <Text size="xs" c="dimmed">
-          {s.selected.length > 1
-            ? `${s.selected.length} items selected.`
-            : "Right-click empty space to add text or pattern marks."}
+          {pieces.status}
         </Text>
       </Group>
     </>

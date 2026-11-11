@@ -94,7 +94,15 @@ export function translateEdges(
   };
 }
 
-export function itemsInBox(doc: PatternDocument, box: Bounds): string[] {
+export function itemsInBox(
+  doc: PatternDocument,
+  box: Bounds,
+  editPieceId: string | null = null,
+): string[] {
+  if (editPieceId && doc.pieces[editPieceId]) {
+    const members = new Set(pieceEdges(doc, doc.pieces[editPieceId]));
+    return edgesInBox(doc, box).filter((id) => members.has(id));
+  }
   return [
     ...expandPieceSelection(doc, edgesInBox(doc, box)),
     ...Object.values(doc.annotations)

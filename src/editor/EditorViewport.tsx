@@ -1000,8 +1000,15 @@ export function EditorViewport() {
         <Button variant="default" {...commandProps(fitSelected)}>
           Fit selection · F
         </Button>
-        <Button variant="default" {...commandProps(commands.editPiece.bind())}>
-          Edit points · E
+        <Button
+          variant="default"
+          {...commandProps(
+            s.editPieceId
+              ? commands.exitPieceEdit.bind()
+              : commands.editPiece.bind(),
+          )}
+        >
+          {s.editPieceId ? "Select pieces" : "Edit points · E"}
         </Button>
         <Text size="xs">{Math.round((view.scale / 2) * 100)}%</Text>
         <SnapSettings />

@@ -93,24 +93,30 @@ export const geometryCommands = {
   curve: edgeCommand("curve", "Convert to curve"),
   reset: edgeCommand("reset", "Convert to straight / remove handles"),
   intersections: edgeCommand("intersections", "Create points at intersections"),
-  createPiece: defineCommand<string>(
+  createPiece: defineCommand<string | { edgeId: string; name: string }>(
     "piece.create-from-contour",
     "Create pattern piece from closed contour",
-    (edgeId) => {
+    (context) => {
+      const edgeId = typeof context === "string" ? context : context.edgeId;
+      const name = typeof context === "string" ? undefined : context.name;
       const s = useEditor.getState();
-      const next = createPieceFromEdge(s.document, edgeId, createId());
+      const next = createPieceFromEdge(s.document, edgeId, createId(), name);
       s.commit(next);
       useEditor.setState({
         tool: "select",
+        editPieceId: null,
         selected: expandPieceSelection(next, [edgeId]),
         selectedGuide: null,
         activePoint: null,
       });
     },
-    (edgeId) => {
+    (context) => {
+      const edgeId = typeof context === "string" ? context : context.edgeId;
       const s = useEditor.getState();
       return (
         !s.preview &&
+        !s.hasDraft &&
+        !s.gestureActive &&
         !!closedCycleForEdge(s.document, edgeId) &&
         !pieceForEdge(s.document, edgeId)
       );

@@ -299,6 +299,8 @@ test("Move accepts signed unit suffixes and Enter finishes an exact polyline onc
   await page.getByRole("textbox", { name: "ΔY (mm)" }).fill("2.5 mm");
   expect((await state(page)).doc.points.a).toEqual({ x: 100, y: 100 });
   await page.getByRole("button", { name: "Apply move" }).click();
+  // Wait for the modal's exit transition before sending workspace shortcuts.
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   expect((await state(page)).doc.points.a).toEqual({ x: 90, y: 102.5 });
   expect((await state(page)).past).toBe(1);
   await page.locator("svg.drafting-surface").focus();

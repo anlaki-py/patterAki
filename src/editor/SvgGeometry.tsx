@@ -59,7 +59,9 @@ export function SvgGeometry({
                 : "var(--mantine-color-gray-light)"
             }
             stroke="none"
-            pointerEvents={piece.locked ? "none" : "all"}
+            pointerEvents={
+              piece.locked || piece.id === editPieceId ? "none" : "all"
+            }
           >
             <title>
               {piece.name}
