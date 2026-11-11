@@ -295,3 +295,83 @@ test("Line placement stays straight after pointer drift on both anchors", async 
     Object.values(current.doc.segments).every((edge) => edge.kind === "line"),
   ).toBe(true);
 });
+
+test("a rectangle drawn with real UI converts when generated IDs make the outline traverse its first edge backward", async ({
+  page,
+}) => {
+  await seed(page, false);
+  await page.evaluate(async () => {
+    const storePath = "/src/editor/store.ts",
+      schemaPath = "/src/document/schema.ts";
+    const { useEditor } = await import(storePath),
+      { emptyDocument } = await import(schemaPath);
+    const doc = emptyDocument("drawn-rectangle-order");
+    doc.unitsDisplay = "mm";
+    useEditor.getState().load(doc);
+    const ids = [
+      "z-origin",
+      "a-top-right",
+      "m-bottom-right",
+      "n-bottom-left",
+      "a-edge",
+      "z-edge",
+      "y-edge",
+      "x-edge",
+      "browser-panel",
+    ];
+    let index = 0;
+    Object.defineProperty(crypto, "randomUUID", {
+      configurable: true,
+      value: () => ids[index++] ?? `extra-${index}`,
+    });
+  });
+  await page.getByRole("button", { name: "Rectangle", exact: true }).click();
+  const canvas = page.locator("svg.drafting-surface"),
+    box = (await canvas.boundingBox())!;
+  const origin = { x: box.x + 180, y: box.y + 160 };
+  await page.mouse.click(origin.x, origin.y);
+  await page
+    .getByRole("textbox", { name: "Width (mm)", exact: true })
+    .fill("100 mm");
+  await page
+    .getByRole("textbox", { name: "Height (mm)", exact: true })
+    .fill("80 mm");
+  await page
+    .getByRole("button", { name: "Create rectangle", exact: true })
+    .click();
+  const drawn = (await state(page)).doc;
+  expect(Object.keys(drawn.segments)).toEqual([
+    "a-edge",
+    "z-edge",
+    "y-edge",
+    "x-edge",
+  ]);
+  await canvas.focus();
+  await page.keyboard.press("v");
+  await page.mouse.click(origin.x + 100, origin.y);
+  const menu = await openPieces(page);
+  await menu
+    .getByRole("menuitem", {
+      name: "Create piece from closed path…",
+      exact: true,
+    })
+    .click();
+  await page
+    .getByRole("textbox", { name: "Piece name", exact: true })
+    .fill("Rectangle panel");
+  await page.getByRole("button", { name: "Create piece", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  const converted = await state(page);
+  expect(converted.doc.pieces["browser-panel"].name).toBe("Rectangle panel");
+  expect(converted.doc.pieces["browser-panel"].stitchingOutline).toHaveLength(
+    4,
+  );
+  expect(converted.doc.points).toEqual(drawn.points);
+  expect(converted.doc.segments).toEqual(drawn.segments);
+  expect(converted.past).toBe(2);
+  await canvas.focus();
+  await page.keyboard.press("Control+z");
+  expect((await state(page)).doc).toEqual(drawn);
+  await page.keyboard.press("Control+Shift+z");
+  expect((await state(page)).doc).toEqual(converted.doc);
+});

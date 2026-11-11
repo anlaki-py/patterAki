@@ -25,9 +25,17 @@ export function orderedOutline(
 ): OutlineEdge[] {
   if (ids.length < 3 || new Set(ids).size !== ids.length)
     throw new Error("A piece needs a simple closed outline.");
-  const first = doc.segments[ids[0]];
-  if (!first) throw new Error("Outline segment is missing.");
-  let current = first.from;
+  const first = doc.segments[ids[0]],
+    second = doc.segments[ids[1]];
+  if (!first || !second) throw new Error("Outline segment is missing.");
+  // Cycle discovery can traverse the first edge in either direction. IDs and
+  // stored from/to directions do not define the contour's traversal direction.
+  const sharesFrom = second.from === first.from || second.to === first.from;
+  const sharesTo = second.from === first.to || second.to === first.to;
+  if (sharesFrom === sharesTo)
+    throw new Error("Outline edges must be connected in order.");
+  const start = sharesFrom ? first.to : first.from;
+  let current = start;
   const outline = ids.map((segmentId) => {
     const edge = doc.segments[segmentId];
     if (!edge || (edge.from !== current && edge.to !== current))
@@ -36,7 +44,7 @@ export function orderedOutline(
     current = reversed ? edge.from : edge.to;
     return { segmentId, reversed };
   });
-  if (current !== first.from)
+  if (current !== start)
     throw new Error("Stitching outline must close by point identity.");
   return normalizeOutline(doc, outline);
 }
