@@ -1,3 +1,11 @@
+import { DraftPrecision } from "../ui/DraftPrecision";
+import { DraftOverlay } from "./DraftOverlay";
+import { exactDraftEndpoint, rectangleDimensions } from "./draftInput";
+import { SplitHover } from "./SplitHover";
+import { useAutoPan, type CanvasPointer } from "./useAutoPan";
+import { DivisionDialog, type DivisionSession } from "../ui/DivisionDialog";
+import { EdgeLengthDialog, openLengthEditor } from "../ui/EdgeLengthDialog";
+import { DimensionOverlay } from "./DimensionOverlay";
 import { SvgAnnotations } from "./SvgAnnotations";
 import { useAnnotationEditor } from "./useAnnotationEditor";
 import { fitView } from "./fitView";
@@ -19,7 +27,7 @@ import { SvgGeometry } from "./SvgGeometry";
 import { GuideOverlay } from "./GuideOverlay";
 import { Rulers } from "./Rulers";
 import { useEffect, useRef, useState, type PointerEvent } from "react";
-import { Button, Group, Menu, NumberInput, Text } from "@mantine/core";
+import { Button, Group, Menu, Text } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useEditor } from "./store";
 import { addPath, splitLine } from "../document/operations";
@@ -31,7 +39,11 @@ import {
   type PatternDocument,
 } from "../document/schema";
 import { commands, dispatchShortcut, toolCommands } from "./commands";
-import { tabCyclesTarget } from "./command";
+import {
+  tabCyclesTarget,
+  isEditingText,
+  hasOpenShortcutOverlay,
+} from "./command";
 import { bindDraftCommands } from "./draftCommands";
 import { commandProps } from "../ui/CommandControls";
 import { MoveDialog } from "../ui/MoveDialog";
@@ -96,6 +108,7 @@ export function EditorViewport() {
   const curveDrag = useCurveDrag();
   const annotations = useAnnotationEditor();
   const placement = usePointPlacement(view.scale);
+  const [division, setDivision] = useState<DivisionSession | null>(null);
   const [draft, setDraft] = useState<Vec2[]>([]);
   const [cursor, setCursor] = useState<CursorSnap>(freeSnap({ x: 0, y: 0 }));
   const cursorRef = useRef<CursorSnap>(cursor);
@@ -119,9 +132,43 @@ export function EditorViewport() {
   const [width, setWidth] = useState<string | number>(18);
   const [height, setHeight] = useState<string | number>(24);
   const space = useRef(false);
+  const exactField = useRef<HTMLInputElement>(null);
+  const lastDraftClick = useRef<{ time: number; x: number; y: number } | null>(
+    null,
+  );
   const doc = s.preview ?? s.document;
   const origin = draft.at(-1);
   const factor = unitFactor[doc.unitsDisplay];
+  let exactPoint: Vec2 | null = null;
+  let exactError = "";
+  if (origin && exact !== "") {
+    try {
+      exactPoint = exactDraftEndpoint(origin, exact, degrees, factor);
+    } catch (error) {
+      exactError = (error as Error).message;
+    }
+  }
+  let rectangleSize: { width: number; height: number } | null = null;
+  let rectangleError = "";
+  if (origin && s.tool === "rectangle") {
+    try {
+      rectangleSize = rectangleDimensions(width, height, factor);
+    } catch (error) {
+      rectangleError = (error as Error).message;
+    }
+  }
+  const draftEnd = exactPoint ?? cursor.point;
+  const focusExact = (seed?: string) => {
+    if (!origin) return;
+    if (exact === "" || seed !== undefined) {
+      setDegrees(angle(origin, cursor.point));
+      setExact(seed ?? distance(origin, cursor.point) / factor);
+    }
+    queueMicrotask(() => {
+      exactField.current?.focus();
+      if (seed === undefined) exactField.current?.select();
+    });
+  };
 
   const setCursorState = (next: CursorSnap) => {
     cursorRef.current = next;
@@ -372,6 +419,29 @@ export function EditorViewport() {
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (
+        e.target instanceof Element &&
+        e.target.closest("[data-dimension], [data-draft-dimension]")
+      )
+        return;
+      if (
+        !e.defaultPrevented &&
+        !e.isComposing &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey &&
+        !isEditingText(e.target) &&
+        !hasOpenShortcutOverlay() &&
+        !(e.target instanceof Element && e.target.closest('[role="button"]')) &&
+        origin &&
+        (s.tool === "line" || s.tool === "polyline") &&
+        (/^[0-9.]$/.test(e.key) || (e.key === "Enter" && draft.length === 1))
+      ) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        focusExact(e.key === "Enter" ? undefined : e.key);
+        return;
+      }
+      if (
         tabCyclesTarget(
           e,
           choices.length,
@@ -419,8 +489,7 @@ export function EditorViewport() {
                       execute: () => annotations.edit(s.selected[0]),
                     })
                   : commands.editLength.bind({
-                      execute: () =>
-                        document.getElementById("line-length")?.focus(),
+                      execute: () => openLengthEditor(s.selected[0]),
                     }),
               ]
             : []),
@@ -449,7 +518,7 @@ export function EditorViewport() {
     };
   });
 
-  const modifiers = (e: PointerEvent<SVGSVGElement>): Modifiers => ({
+  const modifiers = (e: CanvasPointer): Modifiers => ({
     touch: e.pointerType === "touch",
     alt: e.altKey,
     shift: e.shiftKey,
@@ -513,7 +582,25 @@ export function EditorViewport() {
   };
 
   const down = (e: PointerEvent<SVGSVGElement>) => {
+    if (
+      (e.target as Element).closest("[data-dimension], [data-draft-dimension]")
+    )
+      return;
     if (e.button !== 0 && e.button !== 1) return;
+    if ((s.tool === "line" || s.tool === "polyline") && !space.current) {
+      const last = lastDraftClick.current;
+      if (
+        last &&
+        e.timeStamp - last.time < 400 &&
+        Math.hypot(e.clientX - last.x, e.clientY - last.y) < 4
+      )
+        return;
+      lastDraftClick.current = {
+        time: e.timeStamp,
+        x: e.clientX,
+        y: e.clientY,
+      };
+    }
     if (selectionDrag.active() || drag || guideDrag) return;
     e.currentTarget.focus();
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -628,6 +715,10 @@ export function EditorViewport() {
       setDraft([point]);
       return;
     }
+    if (exact !== "") {
+      draftActions.exactLine.run();
+      return;
+    }
     if (distance(origin, point) < 1e-9) return;
     if (s.tool === "line") commitPath([origin, point]);
     else if (
@@ -640,7 +731,7 @@ export function EditorViewport() {
     else setDraft([...draft, point]);
   };
 
-  const move = (e: PointerEvent<SVGSVGElement>) => {
+  const move = (e: CanvasPointer) => {
     lastMove.current = {
       point: position(e),
       pointer: e.pointerId,
@@ -714,6 +805,21 @@ export function EditorViewport() {
     });
   };
 
+  useAutoPan(
+    svg,
+    view,
+    setView,
+    (draft.length > 0 ||
+      s.gestureActive ||
+      selectionDrag.active() ||
+      curveDrag.active()) &&
+      s.tool !== "pan" &&
+      !space.current &&
+      !(drag && !drag.pointId) &&
+      !guideDrag,
+    move,
+  );
+
   const up = (e: PointerEvent<SVGSVGElement>) => {
     finishGuideDrag(e);
     selectionDrag.finish(position(e), e.pointerId, {
@@ -755,8 +861,6 @@ export function EditorViewport() {
     const rect = svg.current?.getBoundingClientRect();
     if (rect) setView(fitView(s.document, rect.width, rect.height));
   };
-  const label = (a: Vec2, b: Vec2) =>
-    `${formatLength(distance(a, b), doc.unitsDisplay)} · ${angle(a, b).toFixed(1)}°`;
   const statusKind = cursor.kind
     ? cursor.label || snapKindLabel(cursor.kind)
     : "";
@@ -845,51 +949,59 @@ export function EditorViewport() {
           </Menu>
         )}
       </Group>
-      {origin && (s.tool === "line" || s.tool === "polyline") && (
-        <Group p="xs" gap="xs" className="precision-bar">
-          <NumberInput
-            label={`Exact length (${doc.unitsDisplay})`}
-            value={exact}
-            onChange={setExact}
-            w={150}
-          />
-          <NumberInput
-            label="Angle (degrees)"
-            value={degrees}
-            onChange={setDegrees}
-            w={140}
-          />
-          <Button {...commandProps(draftActions.exactLine)}>
-            {draftActions.exactLine.label}
-          </Button>
-        </Group>
-      )}
-      {origin && s.tool === "rectangle" && (
-        <Group p="xs" gap="xs" className="precision-bar">
-          <NumberInput
-            label={`Width (${doc.unitsDisplay})`}
-            value={width}
-            onChange={setWidth}
-            w={130}
-          />
-          <NumberInput
-            label={`Height (${doc.unitsDisplay})`}
-            value={height}
-            onChange={setHeight}
-            w={130}
-          />
-          <Button {...commandProps(draftActions.rectangle)}>
-            {draftActions.rectangle.label}
-          </Button>
-        </Group>
+      {origin && (
+        <DraftPrecision
+          tool={s.tool}
+          units={doc.unitsDisplay}
+          exact={exact}
+          degrees={degrees}
+          width={width}
+          height={height}
+          exactError={exactError}
+          rectangleError={rectangleError}
+          setExact={setExact}
+          setDegrees={setDegrees}
+          setWidth={setWidth}
+          setHeight={setHeight}
+          exactField={exactField}
+          exactLine={draftActions.exactLine}
+          rectangle={draftActions.rectangle}
+          onCancel={() => {
+            s.cancel();
+            svg.current?.focus();
+          }}
+          onConfirm={() => svg.current?.focus()}
+        />
       )}
       {placement.dialog}
       {annotations.dialog}
       <MoveDialog />
+      <EdgeLengthDialog />
+      {division && division.cancelVersion === s.cancelVersion && (
+        <DivisionDialog
+          session={division}
+          onClose={() => {
+            setDivision(null);
+            s.cancel();
+          }}
+        />
+      )}
       <CanvasContextMenu
         position={position}
         scale={view.scale}
         onExact={placement.open}
+        onDivide={(edgeId, mode) => {
+          s.cancel();
+          const state = useEditor.getState();
+          useEditor.setState({ selected: [edgeId] });
+          setDivision({
+            base: state.document,
+            revision: state.revision,
+            cancelVersion: state.cancelVersion,
+            edgeId,
+            mode,
+          });
+        }}
         onAddMark={annotations.add}
         onEditMark={annotations.edit}
         cursor={cursor.point}
@@ -905,9 +1017,20 @@ export function EditorViewport() {
             onPointerUp={up}
             onPointerCancel={() => abortGesture()}
             onLostPointerCapture={() => {
-              if (selectionDrag.active() || drag || guideDrag) abortGesture();
+              if (
+                selectionDrag.active() ||
+                curveDrag.active() ||
+                drag ||
+                guideDrag
+              )
+                abortGesture();
             }}
             onDoubleClick={(e) => {
+              if (s.tool === "polyline") {
+                if (draft.length > 1) commitPath(draft);
+                return;
+              }
+              if (s.tool === "line") return;
               const markId = (e.target as SVGElement).closest<SVGElement>(
                 "[data-annotation]",
               )?.dataset.annotation;
@@ -1011,46 +1134,38 @@ export function EditorViewport() {
                   scale={view.scale}
                 />
               </g>
-              {origin &&
-                s.tool === "rectangle" &&
-                typeof width === "number" &&
-                typeof height === "number" &&
-                width > 0 &&
-                height > 0 && (
-                  <rect
-                    x={origin.x}
-                    y={origin.y}
-                    width={width * factor}
-                    height={height * factor}
-                    className="draft-line"
-                    fill="none"
-                    vectorEffect="non-scaling-stroke"
-                  />
-                )}
-              {draft.length > 0 && (
-                <polyline
-                  points={[
-                    ...draft,
-                    ...(s.tool === "rectangle" ? [] : [cursor.point]),
-                  ]
-                    .map((p) => `${p.x},${p.y}`)
-                    .join(" ")}
-                  className="draft-line"
-                  fill="none"
-                  vectorEffect="non-scaling-stroke"
+              <DraftOverlay
+                draft={draft}
+                end={draftEnd}
+                rectangle={s.tool === "rectangle" ? rectangleSize : undefined}
+                scale={view.scale}
+                units={doc.unitsDisplay}
+                focusExact={() => focusExact()}
+              />
+              <DimensionOverlay
+                base={s.document}
+                doc={doc}
+                selected={s.selected}
+                scale={view.scale}
+                movingPoint={drag?.pointId}
+                endpointDoc={
+                  division?.cancelVersion === s.cancelVersion ? s.document : doc
+                }
+                onEdit={openLengthEditor}
+              />
+              {s.tool === "point" && (
+                <SplitHover
+                  doc={s.document}
+                  edgeId={cursor.edgeId}
+                  t={cursor.t}
+                  scale={view.scale}
+                  onEdit={() =>
+                    placement.open(cursor.point, 9 / view.scale, cursor.edgeId)
+                  }
                 />
               )}
-              {origin && s.tool !== "rectangle" && (
-                <text
-                  x={cursor.point.x + 12 / view.scale}
-                  y={cursor.point.y - 12 / view.scale}
-                  fontSize={12 / view.scale}
-                  className="measurement"
-                >
-                  {label(origin, cursor.point)}
-                </text>
-              )}
-              <SnapOverlay snap={cursor} scale={view.scale} />
+
+              {!exactPoint && <SnapOverlay snap={cursor} scale={view.scale} />}
               {selectionDrag.overlay}
             </g>
           </svg>

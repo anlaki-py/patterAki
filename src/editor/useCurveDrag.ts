@@ -86,5 +86,5 @@ export function useCurveDrag() {
       });
     }
   };
-  return { begin, move, finish };
+  return { begin, move, finish, active: () => drag.current !== null };
 }

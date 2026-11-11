@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Button, Group, Modal, NumberInput, Stack, Text } from "@mantine/core";
-import { notifications } from "@mantine/notifications";
+import { Button, Group, Modal, Stack, Text } from "@mantine/core";
+import { LengthInput } from "./LengthInput";
+import { parseLength } from "../document/lengthInput";
 import { unitFactor } from "../document/schema";
 import { useEditor } from "../editor/store";
 import { commitTranslation, previewTranslation } from "../editor/movement";
@@ -22,28 +23,19 @@ export function MoveDialog() {
     setError("");
   }, [s.moveDialogOpen]);
 
-  const values = () => {
-    if (typeof x !== "number" || typeof y !== "number")
-      throw new Error("Enter finite X and Y offsets.");
-    if (!Number.isFinite(x) || !Number.isFinite(y))
-      throw new Error("Enter finite X and Y offsets.");
-    return { x: x * factor, y: y * factor };
-  };
+  const values = () => ({
+    x: parseLength(x, factor),
+    y: parseLength(y, factor),
+  });
 
   const preview = (nextX: string | number, nextY: string | number) => {
     setX(nextX);
     setY(nextY);
-    if (
-      typeof nextX !== "number" ||
-      typeof nextY !== "number" ||
-      !Number.isFinite(nextX) ||
-      !Number.isFinite(nextY)
-    ) {
-      useEditor.setState({ preview: null, previewIssue: null });
-      return;
-    }
     try {
-      previewTranslation({ x: nextX * factor, y: nextY * factor });
+      previewTranslation({
+        x: parseLength(nextX, factor),
+        y: parseLength(nextY, factor),
+      });
       setError("");
     } catch (e) {
       useEditor.setState({ preview: null, previewIssue: null });
@@ -81,7 +73,7 @@ export function MoveDialog() {
               } exactly.`}
         </Text>
         <Group grow align="flex-start">
-          <NumberInput
+          <LengthInput
             label={`ΔX (${units})`}
             value={x}
             onChange={(value) => preview(value, y)}
@@ -89,7 +81,7 @@ export function MoveDialog() {
               if (event.key === "Enter") apply();
             }}
           />
-          <NumberInput
+          <LengthInput
             label={`ΔY (${units})`}
             value={y}
             onChange={(value) => preview(x, value)}
@@ -98,15 +90,10 @@ export function MoveDialog() {
             }}
           />
         </Group>
-        {units !== "mm" && (
-          <Text size="xs" c="dimmed">
-            Stored exactly as{" "}
-            {typeof x === "number" && typeof y === "number"
-              ? `${x * factor} mm / ${y * factor} mm`
-              : "finite millimetres"}
-            .
-          </Text>
-        )}
+        <Text size="xs" c="dimmed">
+          Bare values use {units}. Explicit mm, cm and in suffixes override
+          display units.
+        </Text>
         {error && (
           <Text size="xs" c="red">
             {error}
@@ -121,19 +108,7 @@ export function MoveDialog() {
           <Button variant="default" onClick={cancel}>
             Cancel
           </Button>
-          <Button
-            onClick={() => {
-              try {
-                apply();
-              } catch (e) {
-                notifications.show({
-                  color: "red",
-                  message: (e as Error).message,
-                });
-              }
-            }}
-            disabled={!!error || !!s.previewIssue}
-          >
+          <Button onClick={apply} disabled={!!error || !!s.previewIssue}>
             Apply move
           </Button>
         </Group>

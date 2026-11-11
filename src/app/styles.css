@@ -361,3 +361,11 @@ svg .guide-preview-line {
 .invalid-measurement {
   fill: var(--mantine-color-red-6);
 }
+
+.dimension-label {
+  pointer-events: auto;
+  cursor: pointer;
+}
+.adjacent-dimension {
+  opacity: 0.7;
+}

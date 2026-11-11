@@ -1,4 +1,5 @@
-import { Button, NumberInput, Stack, Text } from "@mantine/core";
+import { LengthInput } from "./LengthInput";
+import { Button, Stack, Text } from "@mantine/core";
 import { useState } from "react";
 import { useEditor } from "../editor/store";
 import { commands } from "../editor/commands";
@@ -15,7 +16,17 @@ export function CurveProperties() {
   const [split, setSplit] = useState<string | number>("");
   return (
     <Stack gap="sm">
-      <Text size="sm">Arc length: {formatLength(length, units)}</Text>
+      <LengthInput
+        id="line-length"
+        data-autofocus
+        label="Arc length (read-only)"
+        readOnly
+        value={formatLength(length, units)}
+      />
+      <Text size="xs">
+        Arc-length changes are unavailable. Drag the curve handles to reshape
+        it.
+      </Text>
       <Text size="sm">
         Chord:{" "}
         {formatLength(
@@ -27,7 +38,7 @@ export function CurveProperties() {
         Drag the two control arms to shape this curve. At a shared point, each
         arm controls one adjacent segment. Arms move independently.
       </Text>
-      <NumberInput
+      <LengthInput
         label={`Insert point along arc from start (${units})`}
         value={split}
         onChange={setSplit}

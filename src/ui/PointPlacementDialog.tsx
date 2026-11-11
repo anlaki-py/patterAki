@@ -1,5 +1,7 @@
+import { parseLength } from "../document/lengthInput";
+import { LengthInput } from "./LengthInput";
 import { useEffect, useMemo, useState } from "react";
-import { Button, Group, NumberInput, Stack, Text } from "@mantine/core";
+import { Button, Group, Stack, Text } from "@mantine/core";
 import {
   applyPointPlacement,
   splitDistances,
@@ -38,8 +40,11 @@ export function PointPlacementDialog({
   const currentRevision = useEditor((s) => s.revision);
   const result = useMemo(() => {
     try {
-      if (typeof entry.value !== "number") throw new Error("Enter a distance.");
-      const distances = splitDistances(total, entry.value * factor, entry.side);
+      const distances = splitDistances(
+        total,
+        parseLength(entry.value, factor),
+        entry.side,
+      );
       return {
         ...distances,
         preview: applyPointPlacement(base, target, distances.fromStart),
@@ -95,7 +100,7 @@ export function PointPlacementDialog({
             {formatLength(total, units)}. The outer endpoints stay fixed;
             changing one distance updates the other.
           </Text>
-          <NumberInput
+          <LengthInput
             data-autofocus
             label={`From A (${units})`}
             value={
@@ -110,7 +115,7 @@ export function PointPlacementDialog({
               setCommitError("");
             }}
           />
-          <NumberInput
+          <LengthInput
             label={`From B (${units})`}
             value={
               entry.side === "end"

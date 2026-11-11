@@ -113,9 +113,19 @@ export function cubicIntersections(a: Cubic, b: Cubic): Intersection[] {
         if (Math.abs(det) < 1e-14) break;
         const nt = t + cross(delta, db) / det,
           nu = u + cross(delta, da) / det;
-        if (nt < 0 || nt > 1 || nu < 0 || nu > 1) break;
-        t = nt;
-        u = nu;
+        // A root at an endpoint can land a few ulps outside [0, 1]. Rejecting
+        // that step leaves the coarse subdivision midpoint as a false nearby
+        // crossing. Clamp only parameter roundoff, not geometric near misses.
+        const parameterRoundoff = 1e-12;
+        if (
+          nt < -parameterRoundoff ||
+          nt > 1 + parameterRoundoff ||
+          nu < -parameterRoundoff ||
+          nu > 1 + parameterRoundoff
+        )
+          break;
+        t = Math.max(0, Math.min(1, nt));
+        u = Math.max(0, Math.min(1, nu));
       }
       const p = cubicPoint(a, t),
         q = cubicPoint(b, u);

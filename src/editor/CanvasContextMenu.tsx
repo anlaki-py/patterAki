@@ -1,3 +1,4 @@
+import type { DivisionMode } from "../document/divisions";
 import {
   cloneElement,
   useState,
@@ -12,8 +13,7 @@ import type { AnnotationKind } from "../document/annotationSchema";
 import { segmentPoint } from "../document/segments";
 import { EdgeMenuItems } from "../ui/EdgeMenuItems";
 import { MarkMenuItems } from "../ui/MarkMenuItems";
-import { LengthEditor } from "../ui/Inspector";
-import { DraggableModal } from "../ui/DraggableModal";
+import { openLengthEditor } from "../ui/EdgeLengthDialog";
 import { commands } from "./commands";
 import type { BoundCommand } from "./command";
 import { CommandMenuItem, notifyCommand } from "../ui/CommandControls";
@@ -34,6 +34,7 @@ export function CanvasContextMenu({
   onAddMark,
   onEditMark,
   cursor,
+  onDivide,
 }: {
   children: ReactElement<SVGProps<SVGSVGElement>>;
   position: (event: { clientX: number; clientY: number }) => Vec2;
@@ -42,12 +43,12 @@ export function CanvasContextMenu({
   onAddMark: (kind: AnnotationKind, point: Vec2) => void;
   onEditMark: (id: string) => void;
   cursor: Vec2;
+  onDivide: (id: string, mode: DivisionMode) => void;
 }) {
   const s = useEditor();
   const touchPoint = useRef<Vec2 | null>(null);
   const [target, setTarget] = useState<Target | null>(null);
   const [opened, setOpened] = useState(false);
-  const [lengthTarget, setLengthTarget] = useState<Target | null>(null);
   const valid =
     target &&
     target.revision === s.revision &&
@@ -103,9 +104,7 @@ export function CanvasContextMenu({
       },
       execute: () => {
         setOpened(false);
-        setLengthTarget(
-          activate({ kind: "edge", id: target.id }, target.point),
-        );
+        openLengthEditor(target.id);
       },
     }),
     point: commands.exactPoint.bind({
@@ -115,6 +114,14 @@ export function CanvasContextMenu({
         exact(target.point, target.id);
       },
     }),
+    divide: (mode: DivisionMode) =>
+      commands.divide.bind({
+        enabled: () => useEditor.getState().selected.length === 1,
+        execute: () => {
+          setOpened(false);
+          onDivide(target.id, mode);
+        },
+      }),
     intersections: report(commands.intersections.bind()),
     piece: report(commands.createPiece.bind(target.id)),
     curve: report(commands.curve.bind()),
@@ -133,16 +140,6 @@ export function CanvasContextMenu({
     setOpened(false);
     onEditMark(id);
   };
-  const closeLength = () => {
-    commands.cancel.bind().run();
-    setLengthTarget(null);
-  };
-  const lengthValid =
-    lengthTarget?.kind === "edge" &&
-    s.document.segments[lengthTarget.id]?.kind === "line" &&
-    s.selected.length === 1 &&
-    s.selected[0] === lengthTarget.id &&
-    s.cancelVersion === lengthTarget.cancelVersion;
   return (
     <>
       <Menu
@@ -287,15 +284,6 @@ export function CanvasContextMenu({
             : "Right-click empty space to add text or pattern marks."}
         </Text>
       </Group>
-      {lengthValid && (
-        <DraggableModal title="Change line length" onClose={closeLength}>
-          <LengthEditor
-            key={`${lengthTarget.id}-${s.revision}`}
-            lengthOnly
-            onApplied={closeLength}
-          />
-        </DraggableModal>
-      )}
     </>
   );
 }

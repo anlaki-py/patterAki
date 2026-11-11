@@ -1,8 +1,6 @@
-import { commands } from "./commands";
 import { CurveHandles } from "./CurveHandles";
-import { segmentPath, segmentLength, segmentPoint } from "../document/segments";
-import { formatLength, type PatternDocument } from "../document/schema";
-import { angle, distance, type Vec2 } from "../geometry/line";
+import { segmentPath } from "../document/segments";
+import type { PatternDocument } from "../document/schema";
 
 export function SvgGeometry({
   doc,
@@ -32,14 +30,9 @@ export function SvgGeometry({
   // The visual markers still render for every point in every tool.
   const pointHandlesEnabled =
     selectedIds.length <= 1 && (interactivePoints ?? !showPoints);
-  const label = (a: Vec2, b: Vec2) =>
-    `${formatLength(distance(a, b), doc.unitsDisplay)} · ${angle(a, b).toFixed(1)}°`;
   return (
     <>
       {Object.values(doc.segments).map((edge) => {
-        const a = doc.points[edge.from],
-          b = doc.points[edge.to];
-        const middle = segmentPoint(doc, edge, 0.5);
         return (
           <g
             key={edge.id}
@@ -59,26 +52,6 @@ export function SvgGeometry({
               stroke="transparent"
               strokeWidth={18 / scale}
             />
-            {selected?.id === edge.id && (
-              <text
-                className="measurement"
-                x={middle.x}
-                y={middle.y - 10 / scale}
-                fontSize={12 / scale}
-                onClick={() =>
-                  commands.editLength
-                    .bind({
-                      execute: () =>
-                        document.getElementById("line-length")?.focus(),
-                    })
-                    .run()
-                }
-              >
-                {edge.kind === "cubic"
-                  ? `Arc ${formatLength(segmentLength(doc, edge), doc.unitsDisplay)} · Chord ${formatLength(distance(a, b), doc.unitsDisplay)}`
-                  : label(a, b)}
-              </text>
-            )}
           </g>
         );
       })}

@@ -25,7 +25,7 @@
 - [x] Debounced, ordered IndexedDB autosave; latest project restore; manual save; lossless JSON export; Zod-validated JSON import; schema v1–v4 migration to current schema v5.
 - [x] Existing unit tests and CI checks. **Not equivalent to browser or end-to-end verification.**
 
-**Current limitations to respect:** closed polylines remain drafting paths until explicitly converted to basic `PatternPiece` identities; most marks are standalone annotations; no production cut contour, SVG/PDF output, project browser, installed/offline PWA, or Playwright suite yet. Preserve and migrate all existing schema-v4 projects when extending the model.
+**Current limitations to respect:** closed polylines remain drafting paths until explicitly converted to basic `PatternPiece` identities; most marks are standalone annotations; no production cut contour, SVG/PDF output, project browser or installed/offline PWA yet. The M1.2 Playwright suite uses installed Chromium. Preserve and migrate all existing schema-v4 projects when extending the model.
 
 ---
 
@@ -65,14 +65,16 @@
 
 ### M1.2 Live dimensions and numeric editing
 
-- [ ] Show affected adjacent lengths/angles during vertex and handle movement; on line/piece movement show delta X/Y. Avoid displaying every dimension at once.
-- [ ] Make dimension labels clickable/tappable for direct numeric editing; Enter on a single selected edge should focus its relevant length control.
-- [ ] Support units in typed values (`125 mm`, `12.5 cm`) with unambiguous conversion to canonical mm. Display up to a sensible number of decimals but never round stored geometry.
-- [ ] Remember and clearly display the last-used **Start / Center / End** length anchor. Visually label A/B endpoints; preserve connected geometry when one moves.
-- [ ] Improve numeric-entry focus/commit/cancel behavior in drafting tools, including keyboard-first exact length/angle input, preview, and one undoable commit.
-- [ ] Display start/end distance and percent on split hover; add `Split at %`, `Divide into N equal segments`, and `Divide every N mm`, in addition to existing exact A/B distance and midpoint insertion.
-- [ ] Make A/B or center origin of split explicit. Reject endpoint duplicates, invalid/zero segments, and over-dense divisions without mutating the document.
-- [ ] Add canvas-edge auto-pan during long drafts/drags without altering mm geometry. Make double-click/Enter finish behavior predictable and prevent duplicate points.
+- [x] Show affected adjacent lengths/angles during vertex and handle movement; on line/piece movement show delta X/Y. Avoid displaying every dimension at once.
+- [x] Make dimension labels clickable/tappable for direct numeric editing; Enter on a single selected edge should focus its relevant length control.
+- [x] Support units in typed values (`125 mm`, `12.5 cm`) with unambiguous conversion to canonical mm. Display up to a sensible number of decimals but never round stored geometry.
+- [x] Remember and clearly display the last-used **Start / Center / End** length anchor. Visually label A/B endpoints; preserve connected geometry when one moves.
+- [x] Improve numeric-entry focus/commit/cancel behavior in drafting tools, including keyboard-first exact length/angle input, preview, and one undoable commit.
+- [x] Display start/end distance and percent on split hover; add `Split at %`, `Divide into N equal segments`, and `Divide every N mm`, in addition to existing exact A/B distance and midpoint insertion.
+- [x] Make A/B or center origin of split explicit. Reject endpoint duplicates, invalid/zero segments, and over-dense divisions without mutating the document.
+- [x] Add canvas-edge auto-pan during long drafts/drags without altering mm geometry. Make double-click/Enter finish behavior predictable and prevent duplicate points.
+
+Implementation and automated verification completed 2026-11-11. Unit coverage includes typed-unit parsing, adjacent/curve dimensions, exact draft geometry, division origins and limits, cubic shape preservation, and atomic undo/failure behavior. All 10 Chromium checks pass, covering label/Enter editing, keyboard drafts, split previews and origins, cancellation, finishing, draft/movement auto-pan, and touch-emulated dimension taps. Physical-device touch keyboards and other browser engines remain pending; this does not complete broader v1 acceptance. See README for controls and limits.
 
 ### M1.3 Curves that are easy to edit
 

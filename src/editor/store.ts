@@ -1,3 +1,4 @@
+import type { Anchor } from "../geometry/line";
 import { createId } from "./ids";
 import { create } from "zustand";
 import {
@@ -13,6 +14,8 @@ import {
 export type Tool =
   "select" | "line" | "polyline" | "rectangle" | "curve" | "point" | "pan";
 type State = {
+  lengthAnchor: Anchor;
+  lengthDialogEdge: string | null;
   document: PatternDocument;
   past: PatternDocument[];
   future: PatternDocument[];
@@ -51,6 +54,8 @@ type State = {
   applySettings: (settings: EditorSettings) => void;
 };
 export const useEditor = create<State>((set, get) => ({
+  lengthAnchor: "start",
+  lengthDialogEdge: null,
   document: emptyDocument(createId()),
   past: [],
   future: [],
@@ -145,6 +150,7 @@ export const useEditor = create<State>((set, get) => ({
       previewIssue: null,
       hasDraft: false,
       moveDialogOpen: false,
+      lengthDialogEdge: null,
       gestureActive: false,
       revision: s.revision + 1,
       cancelVersion: s.cancelVersion + 1,
@@ -157,6 +163,7 @@ export const useEditor = create<State>((set, get) => ({
       previewIssue: null,
       hasDraft: false,
       moveDialogOpen: false,
+      lengthDialogEdge: null,
       gestureActive: false,
       cancelVersion: s.cancelVersion + 1,
     })),

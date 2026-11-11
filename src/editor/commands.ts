@@ -164,6 +164,7 @@ export const commands = {
   rectangle: localCommand("draft.rectangle", "Create rectangle"),
   move: localCommand("edit.move", "Move…"),
   changeLength: localCommand("edge.change-length", "Change length…"),
+  divide: localCommand("edge.divide", "Divide edge…"),
   exactPoint: localCommand("edge.exact-point", "Point at exact distance…"),
   editMark: localCommand("mark.edit", "Edit mark…", [{ key: "Enter" }]),
   text: localCommand("mark.text", "Text / piece label…"),

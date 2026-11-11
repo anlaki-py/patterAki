@@ -1,4 +1,5 @@
-import { endpoint, type Vec2 } from "../geometry/line";
+import { exactDraftEndpoint, rectangleDimensions } from "./draftInput";
+import { type Vec2 } from "../geometry/line";
 import { commands } from "./commands";
 import { useEditor } from "./store";
 export function bindDraftCommands({
@@ -23,6 +24,20 @@ export function bindDraftCommands({
   clearExact: () => void;
 }) {
   const origin = draft.at(-1);
+  const validExact = () => {
+    try {
+      return !!origin && !!exactDraftEndpoint(origin, exact, degrees, factor);
+    } catch {
+      return false;
+    }
+  };
+  const validRectangle = () => {
+    try {
+      return !!origin && !!rectangleDimensions(width, height, factor);
+    } catch {
+      return false;
+    }
+  };
   return {
     finish: commands.finish.bind({
       enabled: () => draft.length > 1,
@@ -33,17 +48,10 @@ export function bindDraftCommands({
       execute: () => setDraft(draft.slice(0, -1)),
     }),
     exactLine: commands.exactLine.bind({
-      enabled: () =>
-        !!origin &&
-        typeof exact === "number" &&
-        Number.isFinite(exact) &&
-        exact > 0 &&
-        typeof degrees === "number" &&
-        Number.isFinite(degrees),
+      enabled: validExact,
       execute: () => {
-        if (!origin || typeof exact !== "number" || typeof degrees !== "number")
-          return;
-        const end = endpoint(origin, exact * factor, degrees);
+        if (!origin) return;
+        const end = exactDraftEndpoint(origin, exact, degrees, factor);
         if (useEditor.getState().tool === "line") commitPath([origin, end]);
         else {
           setDraft([...draft, end]);
@@ -52,23 +60,16 @@ export function bindDraftCommands({
       },
     }),
     rectangle: commands.rectangle.bind({
-      enabled: () =>
-        !!origin &&
-        typeof width === "number" &&
-        Number.isFinite(width) &&
-        width > 0 &&
-        typeof height === "number" &&
-        Number.isFinite(height) &&
-        height > 0,
+      enabled: validRectangle,
       execute: () => {
-        if (!origin || typeof width !== "number" || typeof height !== "number")
-          return;
+        if (!origin) return;
+        const dimensions = rectangleDimensions(width, height, factor);
         commitPath(
           [
             origin,
-            { x: origin.x + width * factor, y: origin.y },
-            { x: origin.x + width * factor, y: origin.y + height * factor },
-            { x: origin.x, y: origin.y + height * factor },
+            { x: origin.x + dimensions.width, y: origin.y },
+            { x: origin.x + dimensions.width, y: origin.y + dimensions.height },
+            { x: origin.x, y: origin.y + dimensions.height },
           ],
           true,
         );

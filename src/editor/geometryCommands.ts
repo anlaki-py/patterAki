@@ -1,3 +1,4 @@
+import { parseLength } from "../document/lengthInput";
 import { defineCommand } from "./command";
 import { executeEdgeActions } from "./edgeActions";
 import { deleteActivePoint, deleteSelection } from "./selectionActions";
@@ -136,13 +137,11 @@ export const geometryCommands = {
     "edge.preview-length",
     "Preview length",
     ({ value, factor, anchor }) => {
-      if (typeof value !== "number")
-        throw new Error("Enter a positive length.");
       const s = useEditor.getState();
       const next = changeLength(
         s.document,
         s.selected[0],
-        value * factor,
+        parseLength(value, factor),
         anchor,
       );
       const check = validateDocumentEdit(s.document, next);
@@ -172,14 +171,14 @@ export const geometryCommands = {
     "edge.insert-point",
     "Insert point",
     ({ value, factor }) => {
-      if (typeof value !== "number")
-        throw new Error("Enter a distance inside the edge.");
       const s = useEditor.getState();
       const target = placementOnEdge(s.document, s.selected[0], 0.5, {
         pointId: createId(),
         newEdgeId: createId(),
       });
-      s.commit(applyPointPlacement(s.document, target, value * factor));
+      s.commit(
+        applyPointPlacement(s.document, target, parseLength(value, factor)),
+      );
     },
     () => {
       const s = useEditor.getState();

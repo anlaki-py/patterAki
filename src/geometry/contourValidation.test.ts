@@ -108,7 +108,7 @@ it("C04 rejects a nonadjacent line/cubic crossing in a closed contour", () => {
       a: { x: 100, y: 100 },
       b: { x: 0, y: 100 },
       control1: { x: 0, y: 200 },
-      control2: { x: 100, y: -100 },
+      control2: { x: 100, y: -300 },
     },
     {
       id: "left",
@@ -119,9 +119,14 @@ it("C04 rejects a nonadjacent line/cubic crossing in a closed contour", () => {
   ];
   const check = validateContourSegments(segments);
   expect(check.valid).toBe(false);
-  expect(check.issues.some((issue) => issue.code === "self-intersection")).toBe(
-    true,
-  );
+  expect(
+    check.issues.some(
+      (issue) =>
+        issue.code === "self-intersection" &&
+        issue.segmentIds.includes("top") &&
+        issue.segmentIds.includes("loop"),
+    ),
+  ).toBe(true);
 });
 
 it("C05 detects a single cubic crossing itself at two interior parameters", () => {
