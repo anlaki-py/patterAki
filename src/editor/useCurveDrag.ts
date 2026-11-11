@@ -1,3 +1,4 @@
+import { itemEditable } from "../document/pieceAccess";
 import { useEffect, useRef } from "react";
 import { notifications } from "@mantine/notifications";
 import { bendCurve, convertToCurve, moveHandle } from "../document/curves";
@@ -27,7 +28,12 @@ export function useCurveDrag() {
       edgeId =
         target.dataset.handleEdge ??
         (s.tool === "curve" ? target.dataset.edge : undefined);
-    if (!edgeId || !s.document.segments[edgeId]) return false;
+    if (
+      !edgeId ||
+      !s.document.segments[edgeId] ||
+      !itemEditable(s.document, edgeId)
+    )
+      return false;
     const t = segmentProjection(s.document, s.document.segments[edgeId], point);
     drag.current = {
       pointer,

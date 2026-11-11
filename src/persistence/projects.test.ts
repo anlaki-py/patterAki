@@ -41,7 +41,7 @@ it("rejects corrupt stored documents rather than replacing them", async () => {
   expect(await database.projects.count()).toBe(1);
   await database.delete();
 });
-it("opens a version 1 saved project as version 6 without rewriting the original record", async () => {
+it("opens a version 1 saved project as version 7 without rewriting the original record", async () => {
   const database = new ProjectDatabase("legacy-" + crypto.randomUUID());
   const { annotations, guides, pieces, ...base } = emptyDocument("old");
   expect(annotations).toEqual({});
@@ -51,7 +51,7 @@ it("opens a version 1 saved project as version 6 without rewriting the original 
   await database
     .table("projects")
     .put({ id: legacy.id, document: legacy, updatedAt: 1 });
-  expect((await latestProject(database))?.schemaVersion).toBe(6);
+  expect((await latestProject(database))?.schemaVersion).toBe(7);
   expect(
     (await database.table("projects").get("old")).document.schemaVersion,
   ).toBe(1);
@@ -100,7 +100,7 @@ it("migrates saved version 2 curves without rewriting their source record", asyn
     .put({ id: legacy.id, document: legacy, updatedAt: 1 });
   expect(await latestProject(database)).toEqual({
     ...legacy,
-    schemaVersion: 6,
+    schemaVersion: 7,
     annotations: {},
     guides: {},
     pieces: {},

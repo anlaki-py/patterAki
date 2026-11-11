@@ -1,3 +1,5 @@
+import { defaultPieceMetadata, identityTransform } from "./pieceSchema";
+import { orderedOutline } from "./pieceTopology";
 import {
   contourSegmentsFor,
   documentCycles,
@@ -16,22 +18,23 @@ export function closedCycleForEdge(
 }
 
 export function pieceEdges(
-  doc: PatternDocument,
+  _doc: PatternDocument,
   piece: PatternPiece,
 ): string[] {
-  const cycle = closedCycleForEdge(doc, piece.rootSegmentId);
-  return cycle?.segmentIds ?? [];
+  return [
+    ...piece.stitchingOutline.map((ref) => ref.segmentId),
+    ...piece.internalPaths.flatMap((path) =>
+      path.edges.map((ref) => ref.segmentId),
+    ),
+  ];
 }
 
 export function pieceForEdge(
   doc: PatternDocument,
   edgeId: string,
 ): PatternPiece | undefined {
-  if (!doc.segments[edgeId]) return undefined;
-  const cycle = closedCycleForEdge(doc, edgeId);
-  if (!cycle) return undefined;
   return Object.values(doc.pieces).find((piece) =>
-    cycle.segmentIds.includes(piece.rootSegmentId),
+    pieceEdges(doc, piece).includes(edgeId),
   );
 }
 
@@ -71,7 +74,18 @@ export function createPieceFromEdge(
     ...doc,
     pieces: {
       ...doc.pieces,
-      [pieceId]: { id: pieceId, name: name.trim(), rootSegmentId: edgeId },
+      [pieceId]: {
+        version: 1,
+        id: pieceId,
+        name: name.trim(),
+        rootSegmentId: edgeId,
+        stitchingOutline: orderedOutline(doc, cycle.segmentIds),
+        internalPaths: [],
+        transform: identityTransform(),
+        metadata: defaultPieceMetadata(),
+        locked: false,
+        visible: true,
+      },
     },
   };
 }
@@ -113,17 +127,61 @@ export function clickPieceSelection(
 
 /** Remove identities only when an explicit topology operation breaks a cycle. */
 export function withoutBrokenPieces(doc: PatternDocument): PatternDocument {
-  const cycles = documentCycles(doc);
   const pieces = Object.fromEntries(
-    Object.entries(doc.pieces).filter(([, piece]) => {
-      const cycle = cycles.find((item) =>
-        item.segmentIds.includes(piece.rootSegmentId),
-      );
-      return (
-        !!cycle &&
-        validateContourSegments(contourSegmentsFor(doc, cycle.segmentIds)).valid
-      );
-    }),
+    Object.entries(doc.pieces)
+      .filter(
+        ([, piece]) =>
+          piece.stitchingOutline.every(
+            (ref) => !!doc.segments[ref.segmentId],
+          ) &&
+          validateContourSegments(
+            contourSegmentsFor(
+              doc,
+              piece.stitchingOutline.map((ref) => ref.segmentId),
+            ),
+          ).valid,
+      )
+      .map(([id, piece]) => [
+        id,
+        {
+          ...piece,
+          internalPaths: piece.internalPaths.filter((path) =>
+            path.edges.every((ref) => !!doc.segments[ref.segmentId]),
+          ),
+        },
+      ]),
   );
   return { ...doc, pieces };
+}
+
+/** Keep ordered references through a de Casteljau/line split, including reversed traversal. */
+export function withSplitPieceEdge(
+  doc: PatternDocument,
+  original: string,
+  added: string,
+): PatternDocument {
+  const split = (refs: PatternPiece["stitchingOutline"]) =>
+    refs.flatMap((ref) =>
+      ref.segmentId !== original
+        ? [ref]
+        : ref.reversed
+          ? [{ segmentId: added, reversed: true }, ref]
+          : [ref, { segmentId: added, reversed: false }],
+    );
+  return {
+    ...doc,
+    pieces: Object.fromEntries(
+      Object.entries(doc.pieces).map(([id, piece]) => [
+        id,
+        {
+          ...piece,
+          stitchingOutline: split(piece.stitchingOutline),
+          internalPaths: piece.internalPaths.map((path) => ({
+            ...path,
+            edges: split(path.edges),
+          })),
+        },
+      ]),
+    ),
+  };
 }

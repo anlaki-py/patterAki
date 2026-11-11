@@ -1,3 +1,9 @@
+import {
+  pieceForItem,
+  itemEditable,
+  visibleDocument,
+} from "../document/pieceAccess";
+import { pieceOutlinePath } from "../document/piecePaths";
 import { CurveHandles } from "./CurveHandles";
 import { segmentPath } from "../document/segments";
 import type { PatternDocument } from "../document/schema";
@@ -10,7 +16,9 @@ export function SvgGeometry({
   interactivePoints,
   showHandles = false,
   activePoint,
+  editPieceId,
 }: {
+  editPieceId?: string | null;
   activePoint?: string | null;
   doc: PatternDocument;
   selectedIds: string[];
@@ -20,6 +28,8 @@ export function SvgGeometry({
   interactivePoints?: boolean;
   showHandles?: boolean;
 }) {
+  const allPieces = Object.values(doc.pieces);
+  doc = visibleDocument(doc);
   const selected =
     selectedIds.length === 1 ? doc.segments[selectedIds[0]] : undefined;
   const selection = new Set(selectedIds);
@@ -34,6 +44,29 @@ export function SvgGeometry({
     selectedIds.length <= 1 && (interactivePoints ?? !showPoints);
   return (
     <>
+      {allPieces
+        .filter((piece) => piece.visible)
+        .map((piece) => (
+          <path
+            key={piece.id}
+            data-edge={piece.locked ? undefined : piece.rootSegmentId}
+            d={pieceOutlinePath(doc, piece)}
+            fill={
+              piece.stitchingOutline.every((ref) =>
+                selection.has(ref.segmentId),
+              )
+                ? "var(--mantine-color-blue-light)"
+                : "var(--mantine-color-gray-light)"
+            }
+            stroke="none"
+            pointerEvents={piece.locked ? "none" : "all"}
+          >
+            <title>
+              {piece.name}
+              {piece.locked ? " · Locked" : " · Select piece"}
+            </title>
+          </path>
+        ))}
       {Object.values(doc.segments).map((edge) => {
         return (
           <g
@@ -47,7 +80,7 @@ export function SvgGeometry({
               vectorEffect="non-scaling-stroke"
             />
             <path
-              data-edge={edge.id}
+              data-edge={itemEditable(doc, edge.id) ? edge.id : undefined}
               className="edge-hit"
               d={segmentPath(doc, edge)}
               fill="none"
@@ -58,6 +91,7 @@ export function SvgGeometry({
         );
       })}
       {visiblePointIds.map((id) => {
+        const parent = pieceForItem(doc, id);
         const p = doc.points[id];
         return (
           <g key={id}>
@@ -70,26 +104,32 @@ export function SvgGeometry({
               }
               pointerEvents="none"
             />
-            {pointHandlesEnabled && (
-              <circle
-                data-point={id}
-                cx={p.x}
-                cy={p.y}
-                r={12 / scale}
-                fill="transparent"
-                className="point-hit"
-              />
-            )}
+            {pointHandlesEnabled &&
+              itemEditable(doc, id) &&
+              (!parent || parent.id === editPieceId) && (
+                <circle
+                  data-point={id}
+                  cx={p.x}
+                  cy={p.y}
+                  r={12 / scale}
+                  fill="transparent"
+                  className="point-hit"
+                />
+              )}
           </g>
         );
       })}
-      {selected && (showHandles || selected.kind === "cubic") && (
-        <CurveHandles
-          doc={doc}
-          pointIds={activePoint ? [activePoint] : [selected.from]}
-          scale={scale}
-        />
-      )}
+      {selected &&
+        itemEditable(doc, selected.id) &&
+        (!pieceForItem(doc, selected.id) ||
+          pieceForItem(doc, selected.id)?.id === editPieceId) &&
+        (showHandles || selected.kind === "cubic") && (
+          <CurveHandles
+            doc={doc}
+            pointIds={activePoint ? [activePoint] : [selected.from]}
+            scale={scale}
+          />
+        )}
     </>
   );
 }

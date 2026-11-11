@@ -1,5 +1,8 @@
+import { itemEditable } from "../document/pieceAccess";
+import { pieceForEdge } from "../document/pieces";
+import { fitSelectionView } from "./fitView";
+import { draftTangent, createDraftDocument } from "./draftInput";
 import { assertValidDocumentEdit } from "../document/contourValidation";
-import { applyDraftTangents } from "../document/curveDraft";
 import { DraftPrecision } from "../ui/DraftPrecision";
 import { DraftOverlay } from "./DraftOverlay";
 import { exactDraftEndpoint, rectangleDimensions } from "./draftInput";
@@ -32,7 +35,7 @@ import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { Button, Group, Menu, Text } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useEditor } from "./store";
-import { addPath, splitLine } from "../document/operations";
+import { splitLine } from "../document/operations";
 import { angle, distance, type Vec2 } from "../geometry/line";
 import type { SnapCandidate, SnapLock } from "../geometry/snapping";
 import {
@@ -275,10 +278,13 @@ export function EditorViewport() {
       s.commit(
         assertValidDocumentEdit(
           s.document,
-          applyDraftTangents(
-            addPath(s.document, points, closed, createId),
+          createDraftDocument(
+            s.document,
+            s.tool,
             points,
+            closed,
             draftTangents.current,
+            createId,
           ),
         ),
       );
@@ -442,6 +448,17 @@ export function EditorViewport() {
     },
   });
 
+  const fitSelected = commands.fitSelection.bind({
+    execute: () => {
+      const rect = svg.current?.getBoundingClientRect();
+      if (rect)
+        setView(
+          fitSelectionView(s.document, s.selected, rect.width, rect.height),
+        );
+    },
+    enabled: () => s.selected.length > 0,
+  });
+
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (
@@ -498,6 +515,7 @@ export function EditorViewport() {
           },
         }),
         escape,
+        fitSelected,
         ...(draft.length ? [draftActions.removePoint] : []),
         ...(transient
           ? [
@@ -681,6 +699,11 @@ export function EditorViewport() {
     if (s.tool === "select" || s.tool === "curve") {
       const pointId = target.dataset.point;
       const edgeId = target.dataset.edge;
+      if (
+        (pointId && !itemEditable(s.document, pointId)) ||
+        (edgeId && !itemEditable(s.document, edgeId))
+      )
+        return;
       if (pointId && !(s.tool === "select" && e.shiftKey)) {
         dragAxis.current = null;
         lock.current = null;
@@ -776,7 +799,7 @@ export function EditorViewport() {
     const press = draftPress.current;
     if (
       press?.pointer === e.pointerId &&
-      distance(position(e), press.start) * view.scale >= 3
+      draftTangent(s.tool, press.start, position(e), view.scale)
     ) {
       const point = position(e);
       draftTangents.current.set(press.index, {
@@ -879,7 +902,7 @@ export function EditorViewport() {
     if (press?.pointer === e.pointerId) {
       draftPress.current = null;
       const end = position(e);
-      if (distance(end, press.start) * view.scale >= 3)
+      if (draftTangent(s.tool, press.start, end, view.scale))
         draftTangents.current.set(press.index, {
           x: end.x - press.start.x,
           y: end.y - press.start.y,
@@ -973,6 +996,12 @@ export function EditorViewport() {
           )}
         >
           {commands.resetView.label}
+        </Button>
+        <Button variant="default" {...commandProps(fitSelected)}>
+          Fit selection · F
+        </Button>
+        <Button variant="default" {...commandProps(commands.editPiece.bind())}>
+          Edit points · E
         </Button>
         <Text size="xs">{Math.round((view.scale / 2) * 100)}%</Text>
         <SnapSettings />
@@ -1104,7 +1133,17 @@ export function EditorViewport() {
                 return;
               }
               const id = (e.target as SVGElement).dataset.edge;
-              if (s.tool === "select" && id) {
+              if (s.tool === "select" && id && itemEditable(s.document, id)) {
+                const piece = pieceForEdge(s.document, id);
+                if (piece && !s.editPieceId) {
+                  s.cancel();
+                  useEditor.setState({
+                    editPieceId: piece.id,
+                    selected: [id],
+                    activePoint: null,
+                  });
+                  return;
+                }
                 const edge = s.document.segments[id];
                 const t = segmentProjection(s.document, edge, position(e));
                 if (t > 0 && t < 1)
@@ -1187,6 +1226,7 @@ export function EditorViewport() {
               <g className={s.previewIssue ? "invalid-preview" : undefined}>
                 <SvgGeometry
                   doc={doc}
+                  editPieceId={s.editPieceId}
                   selectedIds={s.selected}
                   scale={view.scale}
                   showPoints={s.tool === "point"}

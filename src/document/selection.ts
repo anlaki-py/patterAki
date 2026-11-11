@@ -1,3 +1,6 @@
+import { itemEditable } from "./pieceAccess";
+import { composeTransform } from "./pieceTransforms";
+import { pieceEdges } from "./pieces";
 import { annotationTouchesBox } from "./annotationGeometry";
 import type { Vec2 } from "../geometry/line";
 import type { PatternDocument } from "./schema";
@@ -11,6 +14,7 @@ import {
 
 export function edgesInBox(doc: PatternDocument, box: Bounds): string[] {
   return Object.values(doc.segments)
+    .filter((edge) => itemEditable(doc, edge.id))
     .filter((edge) =>
       edge.kind === "cubic"
         ? cubicTouchesBox(asCubic(doc, edge), box)
@@ -26,6 +30,19 @@ export function translateEdges(
 ): PatternDocument {
   if (!Number.isFinite(delta.x) || !Number.isFinite(delta.y))
     throw new Error("Move distances must be finite.");
+  if (ids.some((id) => !itemEditable(doc, id)))
+    throw new Error("Locked or hidden pieces cannot move.");
+  // Whole-piece movement carries internal paths even when only the outline was selected.
+  const selection = new Set(ids);
+  const wholePieces = Object.values(doc.pieces).filter((piece) =>
+    piece.stitchingOutline.every((ref) => selection.has(ref.segmentId)),
+  );
+  ids = [
+    ...new Set([
+      ...ids,
+      ...wholePieces.flatMap((piece) => pieceEdges(doc, piece)),
+    ]),
+  ];
   const moved = new Set<string>();
   for (const id of ids) {
     const edge = doc.segments[id];
@@ -38,10 +55,24 @@ export function translateEdges(
   // including controls on unselected neighbours, so connections stay intact.
   return {
     ...doc,
+    pieces: Object.fromEntries(
+      Object.entries(doc.pieces).map(([id, piece]) => [
+        id,
+        wholePieces.includes(piece)
+          ? {
+              ...piece,
+              transform: composeTransform(
+                { a: 1, b: 0, c: 0, d: 1, e: delta.x, f: delta.y },
+                piece.transform,
+              ),
+            }
+          : piece,
+      ]),
+    ),
     points: Object.fromEntries(
       Object.entries(doc.points).map(([id, point]) => [
         id,
-        moved.has(id) ? shift(point) : point,
+        moved.has(id) ? { ...point, ...shift(point) } : point,
       ]),
     ),
     segments: Object.fromEntries(

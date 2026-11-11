@@ -1,3 +1,4 @@
+import { itemEditable, pieceForItem } from "./pieceAccess";
 import { asCubic } from "./segments";
 import { splitCubic } from "../geometry/bezier";
 import { moveVertex } from "./curves";
@@ -9,7 +10,7 @@ import {
   type Vec2,
 } from "../geometry/line";
 import type { PatternDocument } from "./schema";
-import { withoutBrokenPieces } from "./pieces";
+import { withSplitPieceEdge, withoutBrokenPieces } from "./pieces";
 import {
   formatContourIssues,
   validateClosedPositions,
@@ -29,7 +30,7 @@ export function addPath(
   const next = structuredClone(doc);
   const ids = positions.map((p) => {
     const existing = Object.keys(next.points).find(
-      (key) => distance(next.points[key], p) < 1e-9,
+      (key) => !pieceForItem(next, key) && distance(next.points[key], p) < 1e-9,
     );
     const key = existing ?? id();
     next.points[key] = { ...p };
@@ -71,45 +72,57 @@ export function splitLine(
 ): PatternDocument {
   if (!Number.isFinite(t) || t <= 0 || t >= 1)
     throw new Error("Split position must be inside the line.");
+  if (!itemEditable(doc, id))
+    throw new Error("Locked or hidden pieces cannot be split.");
   const edge = doc.segments[id],
     pointId = createId(),
     edgeId = createId();
   if (edge.kind === "cubic") {
     const [left, right] = splitCubic(asCubic(doc, edge), t);
-    return {
-      ...doc,
-      points: { ...doc.points, [pointId]: left[3] },
-      segments: {
-        ...doc.segments,
-        [id]: { ...edge, to: pointId, control1: left[1], control2: left[2] },
-        [edgeId]: {
-          ...edge,
-          id: edgeId,
-          from: pointId,
-          control1: right[1],
-          control2: right[2],
+    return withSplitPieceEdge(
+      {
+        ...doc,
+        points: { ...doc.points, [pointId]: left[3] },
+        segments: {
+          ...doc.segments,
+          [id]: { ...edge, to: pointId, control1: left[1], control2: left[2] },
+          [edgeId]: {
+            ...edge,
+            id: edgeId,
+            from: pointId,
+            control1: right[1],
+            control2: right[2],
+          },
         },
       },
-    };
+      id,
+      edgeId,
+    );
   }
 
-  return {
-    ...doc,
-    points: {
-      ...doc.points,
-      [pointId]: lerp(doc.points[edge.from], doc.points[edge.to], t),
+  return withSplitPieceEdge(
+    {
+      ...doc,
+      points: {
+        ...doc.points,
+        [pointId]: lerp(doc.points[edge.from], doc.points[edge.to], t),
+      },
+      segments: {
+        ...doc.segments,
+        [id]: { ...edge, to: pointId },
+        [edgeId]: { ...edge, id: edgeId, from: pointId },
+      },
     },
-    segments: {
-      ...doc.segments,
-      [id]: { ...edge, to: pointId },
-      [edgeId]: { ...edge, id: edgeId, from: pointId },
-    },
-  };
+    id,
+    edgeId,
+  );
 }
 export function deleteSegments(
   doc: PatternDocument,
   ids: string[],
 ): PatternDocument {
+  if (ids.some((id) => !itemEditable(doc, id)))
+    throw new Error("Locked or hidden pieces cannot be deleted.");
   const segments = { ...doc.segments };
   for (const id of ids) delete segments[id];
   const used = new Set(

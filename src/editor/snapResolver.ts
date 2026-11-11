@@ -1,3 +1,4 @@
+import { visibleDocument } from "../document/pieceAccess";
 import type { PatternDocument } from "../document/schema";
 import type { Tool } from "./store";
 import { geometrySnaps } from "./geometrySnaps";
@@ -286,6 +287,7 @@ export function resolveSnapDetailed(
   pointer: Vec2,
   options: SnapResolutionOptions,
 ): SnapResolution {
+  doc = visibleDocument(doc);
   const tolerance =
     (options.touch
       ? (options.touchRadiusPx ?? 16)

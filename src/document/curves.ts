@@ -1,3 +1,4 @@
+import { itemEditable } from "./pieceAccess";
 import { asCubic } from "./segments";
 import type { PatternDocument } from "./schema";
 import { type Vec2 } from "../geometry/line";
@@ -5,6 +6,8 @@ export function convertToCurve(
   doc: PatternDocument,
   id: string,
 ): PatternDocument {
+  if (!itemEditable(doc, id))
+    throw new Error("Locked or hidden pieces cannot be edited.");
   const edge = doc.segments[id];
   if (edge.kind === "cubic") return doc;
   const [, control1, control2] = asCubic(doc, edge);
@@ -93,6 +96,8 @@ export function moveVertex(
   id: string,
   position: Vec2,
 ): PatternDocument {
+  if (!itemEditable(doc, id))
+    throw new Error("Locked or hidden pieces cannot be edited.");
   const old = doc.points[id],
     dx = position.x - old.x,
     dy = position.y - old.y;
@@ -119,6 +124,8 @@ export function straightenCurve(
   doc: PatternDocument,
   id: string,
 ): PatternDocument {
+  if (!itemEditable(doc, id))
+    throw new Error("Locked or hidden pieces cannot be edited.");
   const { from, to } = doc.segments[id];
   return {
     ...doc,
@@ -131,6 +138,8 @@ export function setPointMode(
   id: string,
   mode: "corner" | "smooth" | "symmetric",
 ): PatternDocument {
+  if (!itemEditable(doc, id))
+    throw new Error("Locked or hidden pieces cannot be edited.");
   if (!doc.points[id]) throw new Error("Select a point first.");
   const adjacent = Object.values(doc.segments).filter(
     (e) => e.from === id || e.to === id,

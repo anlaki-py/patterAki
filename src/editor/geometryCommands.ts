@@ -1,3 +1,4 @@
+import { itemEditable } from "../document/pieceAccess";
 import { setPointMode } from "../document/curves";
 import { parseLength } from "../document/lengthInput";
 import { defineCommand } from "./command";
@@ -50,6 +51,7 @@ function edgeCommand(
     () => {
       const s = useEditor.getState(),
         ids = selectedEdges();
+      if (ids.some((id) => !itemEditable(s.document, id))) return false;
       if (action === "intersections")
         return s.selected.length === 1 && ids.length === 1;
       return ids.some(
@@ -64,6 +66,7 @@ const singleLine = () => {
   const s = useEditor.getState();
   return (
     s.selected.length === 1 &&
+    itemEditable(s.document, s.selected[0]) &&
     s.document.segments[s.selected[0]]?.kind === "line"
   );
 };
@@ -80,7 +83,12 @@ export const geometryCommands = {
         ),
       );
     },
-    () => !!useEditor.getState().activePoint && !useEditor.getState().preview,
+    () => {
+      const s = useEditor.getState();
+      return (
+        !!s.activePoint && itemEditable(s.document, s.activePoint) && !s.preview
+      );
+    },
   ),
   curve: edgeCommand("curve", "Convert to curve"),
   reset: edgeCommand("reset", "Convert to straight / remove handles"),
@@ -122,7 +130,9 @@ export const geometryCommands = {
         !s.hasDraft &&
         !s.preview &&
         !s.gestureActive &&
-        (s.selected.length > 0 || !!s.activePoint)
+        (s.selected.length > 0 || !!s.activePoint) &&
+        s.selected.every((id) => itemEditable(s.document, id)) &&
+        (!s.activePoint || itemEditable(s.document, s.activePoint))
       );
     },
     [{ key: "Delete" }, { key: "Backspace" }],
@@ -197,7 +207,11 @@ export const geometryCommands = {
     },
     () => {
       const s = useEditor.getState();
-      return s.selected.length === 1 && !!s.document.segments[s.selected[0]];
+      return (
+        s.selected.length === 1 &&
+        !!s.document.segments[s.selected[0]] &&
+        itemEditable(s.document, s.selected[0])
+      );
     },
   ),
 };

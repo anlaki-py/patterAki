@@ -72,7 +72,7 @@ export function CanvasContextMenu({
       const nextSelection = contextSelection(s.selected, hit.id);
       useEditor.setState({
         selected:
-          hit.kind === "edge"
+          hit.kind === "edge" && !s.editPieceId
             ? expandPieceSelection(s.document, nextSelection)
             : nextSelection,
       });
@@ -207,6 +207,17 @@ export function CanvasContextMenu({
             >
               Smooth point
             </Menu.Item>
+          )}
+          {edge && target?.kind === "edge" && (
+            <>
+              <CommandMenuItem command={report(commands.editPiece.bind())} />
+              <CommandMenuItem
+                command={report(commands.duplicatePiece.bind())}
+              />
+              <CommandMenuItem
+                command={report(commands.mirrorPiece.bind("x"))}
+              />
+            </>
           )}
           {edge && target?.kind === "edge" && (
             <EdgeMenuItems

@@ -1,3 +1,15 @@
+import {
+  patternPieceSchema,
+  defaultPieceMetadata,
+  identityTransform,
+} from "./pieceSchema";
+import {
+  connectedPath,
+  orderedOutline,
+  outlineArea,
+  PIECE_AREA_TOLERANCE_MM2,
+} from "./pieceTopology";
+export { patternPieceSchema, type PatternPiece } from "./pieceSchema";
 import { z } from "zod";
 import { annotationInRange } from "./annotationGeometry";
 import { annotationSchema } from "./annotationSchema";
@@ -26,19 +38,13 @@ const segment = z.discriminatedUnion("kind", [
   }),
 ]);
 
-// M1.1 piece-movement bridge: a real, explicit, saved identity for an
-// existing simple closed contour. Outline edge IDs are resolved on demand so
-// insertions/splits keep piece membership without a second topology database.
-// Full seam, transform and metadata semantics are deliberately left for M2.
-export const patternPieceSchema = z
+const legacyPieceSchema = z
   .object({
     id: z.string().min(1),
     name: z.string().trim().min(1).max(120),
     rootSegmentId: z.string().min(1),
   })
   .strict();
-export type PatternPiece = z.infer<typeof patternPieceSchema>;
-
 const version2Base = z
   .object({
     schemaVersion: z.literal(2),
@@ -200,7 +206,7 @@ function validPieceContour(
 }
 function validateCurrentDocument(
   doc: Omit<z.infer<typeof version4Schema>, "schemaVersion"> & {
-    pieces: Record<string, PatternPiece>;
+    pieces: Record<string, z.infer<typeof legacyPieceSchema>>;
   },
   ctx: z.RefinementCtx,
 ) {
@@ -252,13 +258,13 @@ const version5Schema = z
   .object({
     ...version4Schema.shape,
     schemaVersion: z.literal(5),
-    pieces: z.record(z.string(), patternPieceSchema),
+    pieces: z.record(z.string(), legacyPieceSchema),
   })
   .strict()
   .superRefine(validateCurrentDocument);
 
 export const pointModeSchema = z.enum(["corner", "smooth", "symmetric"]);
-const currentSchema = z
+const version6Schema = z
   .object({
     ...version5Schema.shape,
     schemaVersion: z.literal(6),
@@ -269,6 +275,88 @@ const currentSchema = z
   })
   .strict()
   .superRefine(validateCurrentDocument);
+
+const currentSchema = z
+  .object({
+    ...version6Schema.shape,
+    schemaVersion: z.literal(7),
+    pieces: z.record(z.string(), patternPieceSchema),
+  })
+  .strict()
+  .superRefine((doc, ctx) => {
+    // Legacy validation owns annotations and guides; explicit outlines below own topology.
+    validateCurrentDocument({ ...doc, pieces: {} }, ctx);
+    const owned = new Set<string>();
+    const pathIds = new Set<string>();
+    for (const [id, piece] of Object.entries(doc.pieces)) {
+      const outline = piece.stitchingOutline;
+      const paths = [outline, ...piece.internalPaths.map((path) => path.edges)];
+      const refs = paths.flat();
+      const ids = refs.map((ref) => ref.segmentId);
+      let valid: boolean =
+        id === piece.id &&
+        !doc.points[id] &&
+        !doc.segments[id] &&
+        !doc.annotations[id] &&
+        !doc.guides[id] &&
+        outline.some((ref) => ref.segmentId === piece.rootSegmentId) &&
+        connectedPath(doc, outline, true) &&
+        new Set(ids).size === ids.length &&
+        ids.every(
+          (edgeId) =>
+            !owned.has(edgeId) &&
+            Object.hasOwn(doc.segments, edgeId) &&
+            !!doc.points[doc.segments[edgeId].from] &&
+            !!doc.points[doc.segments[edgeId].to],
+        );
+      if (valid) {
+        const pointIds = outline.map((ref) => {
+          const e = doc.segments[ref.segmentId];
+          return ref.reversed ? e.to : e.from;
+        });
+        valid =
+          new Set(pointIds).size === pointIds.length &&
+          outlineArea(doc, outline) > PIECE_AREA_TOLERANCE_MM2 &&
+          validPieceContour(
+            doc,
+            outline.map((ref) => ref.segmentId),
+          );
+        // Piece points cannot also belong to unowned geometry: transforming a piece must never tear a neighbour.
+        const members = new Set(ids);
+        const points = new Set(
+          ids.flatMap((edgeId) => [
+            doc.segments[edgeId].from,
+            doc.segments[edgeId].to,
+          ]),
+        );
+        valid =
+          valid &&
+          Object.values(doc.segments).every(
+            (edge) =>
+              members.has(edge.id) ||
+              (!points.has(edge.from) && !points.has(edge.to)),
+          );
+      }
+      for (const path of piece.internalPaths) {
+        valid =
+          valid &&
+          !pathIds.has(path.id) &&
+          !doc.points[path.id] &&
+          !doc.segments[path.id] &&
+          !doc.pieces[path.id] &&
+          !doc.annotations[path.id] &&
+          !doc.guides[path.id] &&
+          connectedPath(doc, path.edges, path.closed);
+        pathIds.add(path.id);
+      }
+      if (!valid)
+        ctx.addIssue({
+          code: "custom",
+          message: `Invalid topology, winding or identity for pattern piece ${id}`,
+        });
+      ids.forEach((edgeId) => owned.add(edgeId));
+    }
+  });
 
 // Validate each historical representation before migration: malformed v1–v4
 // must not be silently accepted, and newer unknown versions are rejected.
@@ -301,13 +389,41 @@ export const documentSchema = z.preprocess((input) => {
   if (candidate.schemaVersion === 5) {
     const legacy = version5Schema.safeParse(candidate);
     if (!legacy.success) return input;
-    return { ...legacy.data, schemaVersion: 6 };
+    candidate = { ...legacy.data, schemaVersion: 6 };
+  }
+  if (candidate.schemaVersion === 6) {
+    const legacy = version6Schema.safeParse(candidate);
+    if (!legacy.success) return input;
+    let pieces;
+    try {
+      pieces = Object.fromEntries(
+        Object.entries(legacy.data.pieces).map(([id, piece]) => {
+          const cycle = pieceCycle(legacy.data, piece.rootSegmentId)!;
+          return [
+            id,
+            {
+              ...piece,
+              version: 1,
+              stitchingOutline: orderedOutline(legacy.data, cycle),
+              internalPaths: [],
+              transform: identityTransform(),
+              metadata: defaultPieceMetadata(),
+              locked: false,
+              visible: true,
+            },
+          ];
+        }),
+      );
+    } catch {
+      return input;
+    }
+    return { ...legacy.data, schemaVersion: 7, pieces };
   }
   return candidate;
 }, currentSchema);
 export type PatternDocument = z.infer<typeof documentSchema>;
 export const emptyDocument = (id: string): PatternDocument => ({
-  schemaVersion: 6,
+  schemaVersion: 7,
   annotations: {},
   guides: {},
   pieces: {},

@@ -1,6 +1,8 @@
+import { visibleDocument } from "../document/pieceAccess";
 import { annotationBounds } from "../document/annotationGeometry";
 import type { PatternDocument } from "../document/schema";
 export function fitView(doc: PatternDocument, width: number, height: number) {
+  doc = visibleDocument(doc);
   const points = [
     ...Object.values(doc.points),
     ...Object.values(doc.segments).flatMap((edge) =>
@@ -25,4 +27,33 @@ export function fitView(doc: PatternDocument, width: number, height: number) {
     y: (height - h * scale) / 2 - minY * scale,
     scale,
   };
+}
+
+export function fitSelectionView(
+  doc: PatternDocument,
+  ids: string[],
+  width: number,
+  height: number,
+) {
+  const selected = new Set(ids);
+  const segments = Object.fromEntries(
+    Object.entries(doc.segments).filter(([id]) => selected.has(id)),
+  );
+  const points = new Set(
+    Object.values(segments).flatMap((edge) => [edge.from, edge.to]),
+  );
+  return fitView(
+    {
+      ...doc,
+      segments,
+      points: Object.fromEntries(
+        Object.entries(doc.points).filter(([id]) => points.has(id)),
+      ),
+      annotations: Object.fromEntries(
+        Object.entries(doc.annotations).filter(([id]) => selected.has(id)),
+      ),
+    },
+    width,
+    height,
+  );
 }

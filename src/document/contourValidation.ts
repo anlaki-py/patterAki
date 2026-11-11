@@ -1,3 +1,8 @@
+import {
+  outlineArea,
+  connectedPath,
+  PIECE_AREA_TOLERANCE_MM2,
+} from "./pieceTopology";
 import type { PatternDocument } from "./schema";
 import type { Segment } from "./segments";
 import {
@@ -165,6 +170,23 @@ export function validateDocumentEdit(
   const changed = changedSegmentIds(before, after);
   if (!changed.size) return { valid: true, issues: [] };
   const issues: ContourIssue[] = [];
+  for (const piece of Object.values(after.pieces)) {
+    const ids = piece.stitchingOutline.map((ref) => ref.segmentId);
+    if (!ids.some((id) => changed.has(id))) continue;
+    if (
+      !connectedPath(after, piece.stitchingOutline, true) ||
+      outlineArea(after, piece.stitchingOutline) <= PIECE_AREA_TOLERANCE_MM2
+    )
+      issues.push({
+        code: "unknown-topology",
+        segmentIds: ids,
+        message: "Piece outline must stay closed, nondegenerate and clockwise.",
+      });
+    else
+      issues.push(
+        ...validateContourSegments(contourSegmentsFor(after, ids)).issues,
+      );
+  }
   const afterCycles = documentCycles(after);
   for (const cycle of afterCycles) {
     if (!cycle.segmentIds.some((id) => changed.has(id))) continue;

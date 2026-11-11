@@ -1,3 +1,4 @@
+import { itemEditable } from "../document/pieceAccess";
 import { segmentPoint, segmentProjection } from "../document/segments";
 import type { PatternDocument } from "../document/schema";
 import { splitLine } from "../document/operations";
@@ -19,6 +20,7 @@ export function findPointInsertion(
       }
     | undefined;
   for (const edge of Object.values(doc.segments)) {
+    if (!itemEditable(doc, edge.id)) continue;
     const a = doc.points[edge.from],
       b = doc.points[edge.to];
     const t = segmentProjection(doc, edge, cursor),

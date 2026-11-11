@@ -1,3 +1,5 @@
+import { clickSelection } from "./selection";
+import { itemEditable } from "../document/pieceAccess";
 import { itemsInBox, translateSelection } from "../document/selection";
 import type { PatternDocument } from "../document/schema";
 import { selectionBounds, type Bounds } from "../geometry/bounds";
@@ -37,12 +39,19 @@ export function beginSelectionDrag(options: {
   additive: boolean;
   resolve?: SelectionDragResolver;
 }) {
-  const { itemId, point: start, pointer, scale, additive, resolve } = options;
+  const { point: start, pointer, scale, additive, resolve } = options;
+  const itemId =
+    options.itemId &&
+    itemEditable(useEditor.getState().document, options.itemId)
+      ? options.itemId
+      : undefined;
   const initial = useEditor.getState();
   initial.cancel();
   const baseSelection = initial.selected;
   const selected = itemId
-    ? clickPieceSelection(initial.document, baseSelection, itemId, additive)
+    ? initial.editPieceId
+      ? clickSelection(baseSelection, itemId, additive)
+      : clickPieceSelection(initial.document, baseSelection, itemId, additive)
     : additive
       ? baseSelection
       : [];

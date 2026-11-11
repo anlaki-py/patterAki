@@ -1,3 +1,4 @@
+import { PieceProperties } from "./PieceProperties";
 import { CurveProperties } from "./CurveProperties";
 import { GuideProperties } from "./GuideProperties";
 import { Button, Select, Stack, Text, TextInput } from "@mantine/core";
@@ -70,6 +71,7 @@ export function Inspector() {
             commands.units.bind(v).run();
         }}
       />
+      <PieceProperties />
       {s.selected.length > 1 ? (
         <Text size="sm">
           {s.selected.length} items selected. Drag a selected item to move them

@@ -70,7 +70,7 @@ it("P02 old v4 projects migrate without inventing pieces", () => {
     guides: drawn.guides,
   };
   const migrated = parseProject(JSON.stringify(previous));
-  expect(migrated.schemaVersion).toBe(6);
+  expect(migrated.schemaVersion).toBe(7);
   expect(migrated.pieces).toEqual({});
   expect(migrated.points).toEqual(drawn.points);
   expect(migrated.segments).toEqual(drawn.segments);
@@ -161,9 +161,10 @@ it("P06 numeric moves and undo/redo preserve piece membership in one step", () =
   });
   commitTranslation({ x: 2.5, y: -3 });
   expect(useEditor.getState().past).toHaveLength(1);
-  expect(useEditor.getState().document.pieces["piece-1"]).toEqual(
-    doc.pieces["piece-1"],
-  );
+  expect(useEditor.getState().document.pieces["piece-1"]).toMatchObject({
+    id: "piece-1",
+    transform: { e: 2.5, f: -3 },
+  });
   useEditor.getState().undo();
   expect(useEditor.getState().document).toEqual(doc);
   useEditor.getState().redo();

@@ -1,3 +1,5 @@
+import { pieceCommands } from "./pieceCommands";
+import { itemEditable } from "../document/pieceAccess";
 import { defineCommand, localCommand, type Shortcut } from "./command";
 import { geometryCommands } from "./geometryCommands";
 import { commitTranslation } from "./movement";
@@ -19,7 +21,7 @@ const toolDefinitions = tools.map((tool) =>
     tool.label,
     () => {
       useEditor.getState().cancel();
-      useEditor.setState({ tool: tool.id, selected: [] });
+      useEditor.setState({ tool: tool.id, selected: [], editPieceId: null });
     },
     undefined,
     [{ key: tool.key }],
@@ -36,7 +38,9 @@ const nudgeEnabled = () => {
     !s.preview &&
     !s.gestureActive &&
     !s.moveDialogOpen &&
-    (!!s.activePoint || s.selected.length > 0)
+    (!!s.activePoint || s.selected.length > 0) &&
+    s.selected.every((id) => itemEditable(s.document, id)) &&
+    (!s.activePoint || itemEditable(s.document, s.activePoint))
   );
 };
 function nudge(
@@ -80,6 +84,7 @@ export const nudgeCommands = nudgeDirections.flatMap(
 );
 export const commands = {
   ...geometryCommands,
+  ...pieceCommands,
   undo: defineCommand(
     "undo",
     "Undo",
@@ -112,7 +117,9 @@ export const commands = {
       useEditor.setState({
         tool: "select",
         selected: [
-          ...Object.keys(s.document.segments),
+          ...Object.keys(s.document.segments).filter((id) =>
+            itemEditable(s.document, id),
+          ),
           ...Object.keys(s.document.annotations),
         ],
       });
@@ -152,6 +159,9 @@ export const commands = {
   resetLayout: localCommand("view.reset-layout", "Reset workspace layout"),
   help: localCommand("help.controls", "Drafting help"),
   shortcutReference: localCommand("help.shortcuts", "Keyboard shortcuts"),
+  fitSelection: localCommand("view.fit-selection", "Fit selection", [
+    { key: "f" },
+  ]),
   fit: localCommand("view.fit", "Fit all"),
   resetView: localCommand("view.reset", "Reset view"),
   finish: localCommand("draft.finish", "Finish line", [{ key: "Enter" }]),
@@ -199,6 +209,7 @@ export const commandRegistry = [
   ...Object.values(commands),
 ];
 export const editCommands = [
+  commands.editPiece.bind(),
   commands.undo.bind(),
   commands.redo.bind(),
   commands.delete.bind(),

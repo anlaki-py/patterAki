@@ -1,3 +1,4 @@
+import { pieceEdges } from "../document/pieces";
 import type { Anchor } from "../geometry/line";
 import { createId } from "./ids";
 import { create } from "zustand";
@@ -14,6 +15,7 @@ import {
 export type Tool =
   "select" | "line" | "polyline" | "rectangle" | "curve" | "point" | "pan";
 type State = {
+  editPieceId: string | null;
   lengthAnchor: Anchor;
   lengthDialogEdge: string | null;
   document: PatternDocument;
@@ -54,6 +56,7 @@ type State = {
   applySettings: (settings: EditorSettings) => void;
 };
 export const useEditor = create<State>((set, get) => ({
+  editPieceId: null,
   lengthAnchor: "start",
   lengthDialogEdge: null,
   document: emptyDocument(createId()),
@@ -74,14 +77,30 @@ export const useEditor = create<State>((set, get) => ({
   previewIssue: null,
   cancelVersion: 0,
   commit: (doc) => {
-    documentSchema.parse(doc);
+    doc = documentSchema.parse(doc);
     const s = get();
+    for (const piece of Object.values(s.document.pieces)) {
+      if (!piece.locked && piece.visible) continue;
+      for (const id of pieceEdges(s.document, piece)) {
+        const edge = s.document.segments[id];
+        if (
+          JSON.stringify(edge) !== JSON.stringify(doc.segments[id]) ||
+          JSON.stringify(s.document.points[edge.from]) !==
+            JSON.stringify(doc.points[edge.from]) ||
+          JSON.stringify(s.document.points[edge.to]) !==
+            JSON.stringify(doc.points[edge.to])
+        )
+          throw new Error("Locked or hidden piece geometry cannot be edited.");
+      }
+    }
     if (JSON.stringify(doc) === JSON.stringify(s.document)) {
       set({ preview: null, previewIssue: null });
       return;
     }
     set({
       document: doc,
+      editPieceId:
+        s.editPieceId && doc.pieces[s.editPieceId] ? s.editPieceId : null,
       selected: s.selected.filter(
         (id) => !!doc.segments[id] || !!doc.annotations[id],
       ),
@@ -107,6 +126,7 @@ export const useEditor = create<State>((set, get) => ({
     if (doc)
       set({
         document: doc,
+        editPieceId: null,
         past: s.past.slice(0, -1),
         future: [s.document, ...s.future],
         selected: [],
@@ -127,6 +147,7 @@ export const useEditor = create<State>((set, get) => ({
     if (doc)
       set({
         document: doc,
+        editPieceId: null,
         past: [...s.past, s.document],
         future: s.future.slice(1),
         selected: [],
@@ -141,6 +162,7 @@ export const useEditor = create<State>((set, get) => ({
     documentSchema.parse(doc);
     set((s) => ({
       document: doc,
+      editPieceId: null,
       past: [],
       future: [],
       selected: [],

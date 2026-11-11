@@ -6,6 +6,7 @@ export function applyDraftTangents(
   doc: PatternDocument,
   positions: Vec2[],
   tangents: ReadonlyMap<number, Vec2>,
+  excludedSegments: ReadonlySet<string> = new Set(),
 ): PatternDocument {
   const points = { ...doc.points },
     segments = { ...doc.segments };
@@ -14,6 +15,7 @@ export function applyDraftTangents(
     return tangents.get(index);
   };
   for (const edge of Object.values(segments)) {
+    if (excludedSegments.has(edge.id)) continue;
     const a = points[edge.from],
       b = points[edge.to];
     const start = tangentAt(edge.from),
