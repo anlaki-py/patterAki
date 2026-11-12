@@ -54,6 +54,7 @@ import {
   saveWorkspaceLayout,
 } from "./workspaceLayout";
 import { RenameProjectDialog, SavedProjectsDialog } from "./ProjectDialogs";
+import { SvgExportDialog } from "../ui/SvgExportDialog";
 import { ShortcutHelp } from "./ShortcutHelp";
 import "./m02.css";
 
@@ -84,6 +85,7 @@ function exportJson() {
 export function App() {
   const s = useEditor();
   const mobile = useMediaQuery("(max-width: 760px)");
+  const [svgExport, setSvgExport] = useState(false);
   const [layout, setLayout] = useState(readWorkspaceLayout);
   const [layoutEpoch, setLayoutEpoch] = useState(0);
   const properties = layout.inspectorVisible;
@@ -237,6 +239,7 @@ export function App() {
     commands.save.bind({ execute: saveNow }),
     commands.importProject.bind({ execute: () => file.current?.click() }),
     commands.exportProject.bind({ execute: exportJson }),
+    commands.exportSvg.bind({ execute: () => setSvgExport(true) }),
     commands.deleteProject.bind({
       execute: () => deleteProject(useEditor.getState().document.id),
     }),
@@ -515,6 +518,7 @@ export function App() {
       >
         <Inspector />
       </Drawer>
+      {svgExport && <SvgExportDialog onClose={() => setSvgExport(false)} />}
       <input
         ref={file}
         type="file"

@@ -161,6 +161,7 @@ export const commands = {
   deleteProject: localCommand("project.delete", "Delete saved project…"),
   importProject: localCommand("project.import", "Import JSON…"),
   save: localCommand("project.save", "Save locally", [{ key: "s", mod: true }]),
+  exportSvg: localCommand("project.export-svg", "Export vector SVG…"),
   exportProject: localCommand("project.export", "Export editable JSON"),
   theme: localCommand("view.theme", "Toggle light / dark"),
   properties: localCommand("view.properties", "Properties"),

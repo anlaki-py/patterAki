@@ -18,6 +18,7 @@ import {
 } from "../document/sewingSchema";
 import { edgeAllowance, updateSewing } from "../document/sewing";
 import { commands } from "../editor/commands";
+import { downloadSvg } from "../export/download";
 import { exportSewingSvg } from "../export/svg";
 import {
   newSewingSession,
@@ -294,18 +295,11 @@ export function SewingProperties({ piece }: { piece: PatternPiece }) {
                 onClick={() =>
                   run(() => {
                     const svg = exportSewingSvg(state.document, [piece.id], {
-                        metadata,
-                        marks,
-                        internal,
-                      }),
-                      url = URL.createObjectURL(
-                        new Blob([svg], { type: "image/svg+xml" }),
-                      ),
-                      a = document.createElement("a");
-                    a.href = url;
-                    a.download = `${piece.name}.svg`;
-                    a.click();
-                    setTimeout(() => URL.revokeObjectURL(url), 1000);
+                      metadata,
+                      marks,
+                      internal,
+                    });
+                    downloadSvg(svg, piece.name);
                   })
                 }
               >
@@ -313,7 +307,8 @@ export function SewingProperties({ piece }: { piece: PatternPiece }) {
               </Button>
               <Text size="xs">
                 SVG includes physical mm sizing and optional printable metadata.
-                PDF tiling and nonzero cut offsets arrive in M3.
+                Use File → Export vector SVG for cut outlines and multiple
+                pieces. PDF tiling remains a later milestone.
               </Text>
               {error && (
                 <Text c="red" role="alert">

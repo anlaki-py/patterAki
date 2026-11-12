@@ -25,7 +25,7 @@
 - [x] Debounced, ordered IndexedDB autosave; latest project restore; manual save; lossless JSON export; Zod-validated JSON import; schema v1–v8 migration to current schema v9.
 - [x] Existing unit tests and CI checks. **Not equivalent to browser or end-to-end verification.**
 
-**Current limitations to respect:** closed polylines remain drafting paths until explicitly converted to basic `PatternPiece` identities; most marks are standalone annotations; no cut-layer export, calibrated PDF output or installed/offline PWA yet. M2.2 provides physical-size sewing SVG output. The M1.2 Playwright suite uses installed Chromium. Preserve and migrate all existing schema-v4 projects when extending the model.
+**Current limitations to respect:** closed polylines remain drafting paths until explicitly converted to basic `PatternPiece` identities; most marks are standalone annotations; no calibrated PDF output or installed/offline PWA yet. M3.2 provides cut/stitch vector SVG export. M2.2 provides physical-size sewing SVG output. The M1.2 Playwright suite uses installed Chromium. Preserve and migrate all existing schema-v4 projects when extending the model.
 
 ---
 
@@ -151,9 +151,11 @@ Implementation and verification, 2026-11-12: pure mm offset engine, schema v9 mi
 
 ### M3.2 Vector SVG export
 
-- [ ] Add `src/export/svg.ts` generated from the canonical model (not screen SVG/viewport state), with physical `width`/`height` in mm, correct `viewBox`, and preserved cubic/vector paths.
-- [ ] Export selected piece or all pieces, with optional cut/stitch/marks/internal construction layer visibility. Exclude transient handles, snap overlays, and selection adornments.
-- [ ] Test SVG physical dimensions, escaping of annotation text, rotations/transforms, and import-independent rendering in a standard viewer.
+- [x] Add `src/export/svg.ts` generated from the canonical model (not screen SVG/viewport state), with physical `width`/`height` in mm, correct `viewBox`, and preserved cubic/vector paths.
+- [x] Export selected piece or all pieces, with optional cut/stitch/marks/internal construction layer visibility. Exclude transient handles, snap overlays, and selection adornments.
+- [x] Test SVG physical dimensions, escaping of annotation text, rotations/transforms, and import-independent rendering in a standard viewer.
+
+Implementation and verification, 2026-11-12: canonical mm SVG export with matching physical dimensions/viewBox, exact world-space stitch/internal cubics, derived cut polygons, selected/all-visible scope, independent cut/stitch/marks/internal layers, metadata and escaped free annotations. Active edits and empty layer choices disable download; export/offset failures preserve geometry and history. All 484 Vitest tests, lint, formatting and build pass. Installed Chromium 157.0.8103.38 verified all 37 browser scenarios across the full run and targeted reruns. The full run passed 36 and timed out capturing a full-page standalone SVG screenshot after its geometry assertions passed; bounded viewport capture resolves that test, and all three SVG scenarios pass on recheck. Viewer and 390 px dialog screenshots were inspected. Physical-print, other-engine and real-device acceptance remain outside M3.2. Both original specifications are unchanged.
 
 ### M3.3 Exact-scale vector PDF and A4 tiling
 

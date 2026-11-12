@@ -21,7 +21,19 @@ export function sewingExportBounds(
   ids: string[],
   options: SewingExportOptions,
 ) {
-  const bounds = pieceBounds(doc, ids);
+  const boundedDoc = { ...doc, pieces: { ...doc.pieces } };
+  for (const id of ids) {
+    const p = doc.pieces[id];
+    boundedDoc.pieces[id] = {
+      ...p,
+      internalPaths: options.internal
+        ? p.internalPaths.filter(
+            (path) => p.sewing?.paths[path.id]?.export !== false,
+          )
+        : [],
+    };
+  }
+  const bounds = pieceBounds(boundedDoc, ids);
   const include = (x: number, y: number, r = 0) => {
     bounds.min.x = Math.min(bounds.min.x, x - r);
     bounds.min.y = Math.min(bounds.min.y, y - r);
