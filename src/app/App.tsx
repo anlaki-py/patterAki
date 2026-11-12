@@ -1,4 +1,3 @@
-import { createId } from "../editor/ids";
 import { useEffect, useRef, useState } from "react";
 import {
   ActionIcon,
@@ -42,18 +41,15 @@ import { CommandMenuItem, commandProps } from "../ui/CommandControls";
 import { Inspector } from "../ui/Inspector";
 import { SnapSettings } from "../ui/SnapSettings";
 import { SaveFeedback } from "../ui/SaveFeedback";
-import { emptyDocument, parseProject } from "../document/schema";
+import { parseProject } from "../document/schema";
 import { saveNow, startPersistence } from "../persistence/autosave";
-import {
-  getSavedProject,
-  deleteSavedProject,
-} from "../persistence/projectBrowser";
 import {
   defaultWorkspaceLayout,
   readWorkspaceLayout,
   saveWorkspaceLayout,
 } from "./workspaceLayout";
-import { RenameProjectDialog, SavedProjectsDialog } from "./ProjectDialogs";
+import { useProjectActions } from "./useProjectActions";
+import { exportJson } from "./projectFiles";
 import { PdfExportDialog } from "../ui/PdfExportDialog";
 import { SvgExportDialog } from "../ui/SvgExportDialog";
 import { ShortcutHelp } from "./ShortcutHelp";
@@ -68,20 +64,6 @@ const icons = {
   rectangle: Square,
   pan: Hand,
 };
-
-function exportJson() {
-  const doc = useEditor.getState().document;
-  const url = URL.createObjectURL(
-    new Blob([JSON.stringify(doc, null, 2)], { type: "application/json" }),
-  );
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `${doc.name.replace(/[^\w -]/g, "_")}.json`;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
 
 export function App() {
   const s = useEditor();
@@ -104,120 +86,7 @@ export function App() {
   useEffect(() => {
     saveWorkspaceLayout(layout);
   }, [layout]);
-  const reportError = (error: unknown) =>
-    notifications.show({
-      color: "red",
-      message:
-        error instanceof Error
-          ? error.message
-          : "Could not complete this action.",
-    });
-  const switchWorkspace = (
-    action: () => void | Promise<void>,
-  ): Promise<boolean> => {
-    const perform = async () => {
-      try {
-        if (!(await saveNow())) {
-          notifications.show({
-            color: "red",
-            message:
-              "Could not save your current project. Export JSON before switching.",
-          });
-          return false;
-        }
-        // A draft is transient and must not be carried into another project.
-        useEditor.getState().cancel();
-        await action();
-        return true;
-      } catch (error) {
-        reportError(error);
-        return false;
-      }
-    };
-    const state = useEditor.getState();
-    if (!state.hasDraft && !state.preview && !state.gestureActive)
-      return perform();
-    return new Promise((resolve) => {
-      let confirmed = false;
-      modals.openConfirmModal({
-        title: "Discard the unfinished edit?",
-        children: (
-          <Text size="sm">
-            Committed changes will be saved. The active drawing or drag will be
-            discarded.
-          </Text>
-        ),
-        labels: {
-          confirm: "Discard edit and continue",
-          cancel: "Keep editing",
-        },
-        onClose: () => {
-          if (!confirmed) resolve(false);
-        },
-        onConfirm: () => {
-          confirmed = true;
-          void perform().then(resolve);
-        },
-      });
-    });
-  };
-  const openProjects = () =>
-    modals.open({
-      modalId: "saved-projects",
-      title: "Open saved project",
-      size: "lg",
-      children: (
-        <SavedProjectsDialog
-          currentId={useEditor.getState().document.id}
-          onOpen={async (id) => {
-            const opened = await switchWorkspace(async () => {
-              const doc = await getSavedProject(id);
-              useEditor.getState().load(doc);
-            });
-            if (opened) modals.close("saved-projects");
-            return opened;
-          }}
-          onDelete={(id, refresh) => deleteProject(id, refresh)}
-        />
-      ),
-    });
-  const deleteProject = (id: string, refresh?: () => void) => {
-    modals.openConfirmModal({
-      title: "Delete saved project?",
-      children: (
-        <Text size="sm">
-          This permanently deletes this project's local copy. Export JSON first
-          if you need a backup. Other projects are not affected.
-        </Text>
-      ),
-      labels: { confirm: "Delete project", cancel: "Cancel" },
-      confirmProps: { color: "red" },
-      onConfirm: () => {
-        void (async () => {
-          const wasCurrent = useEditor.getState().document.id === id;
-          // Flush queued writes before deleting, so an earlier autosave cannot restore it.
-          if (wasCurrent && !(await saveNow()))
-            throw new Error(
-              "Local storage could not save. Export JSON before deleting.",
-            );
-          await deleteSavedProject(id);
-          if (wasCurrent) useEditor.getState().load(emptyDocument(createId()));
-          refresh?.();
-        })().catch(reportError);
-      },
-    });
-  };
-  const renameProject = () =>
-    modals.open({
-      modalId: "rename-project",
-      title: "Rename project",
-      children: (
-        <RenameProjectDialog
-          name={useEditor.getState().document.name}
-          onClose={() => modals.close("rename-project")}
-        />
-      ),
-    });
+  const projectActions = useProjectActions();
   const help = () =>
     modals.open({
       title: "Drafting help and keyboard shortcuts",
@@ -231,21 +100,18 @@ export function App() {
   const fileCommands = [
     commands.newProject.bind({
       execute: () => {
-        void switchWorkspace(() =>
-          useEditor.getState().load(emptyDocument(createId())),
-        );
+        void projectActions.create();
       },
     }),
-    commands.openProject.bind({ execute: openProjects }),
-    commands.renameProjectDialog.bind({ execute: renameProject }),
+    commands.openProject.bind({ execute: projectActions.openProjects }),
+    commands.renameProjectDialog.bind({ execute: projectActions.rename }),
+    commands.recoveryCopy.bind({ execute: projectActions.copyCurrent }),
     commands.save.bind({ execute: saveNow }),
     commands.importProject.bind({ execute: () => file.current?.click() }),
     commands.exportProject.bind({ execute: exportJson }),
     commands.exportSvg.bind({ execute: () => setSvgExport(true) }),
     commands.exportPdf.bind({ execute: () => setPdfExport(true) }),
-    commands.deleteProject.bind({
-      execute: () => deleteProject(useEditor.getState().document.id),
-    }),
+    commands.deleteProject.bind({ execute: projectActions.remove }),
   ];
   const themeCommand = commands.theme.bind({ execute: toggleColorScheme });
   const propertiesCommand = commands.properties.bind({
@@ -498,6 +364,7 @@ export function App() {
         </Text>
         <SaveFeedback
           status={s.saveStatus}
+          onRecover={projectActions.copyCurrent}
           onRetry={() => {
             void commands.save.bind({ execute: saveNow }).run();
           }}
@@ -536,15 +403,13 @@ export function App() {
             if (picked.size > 10_000_000)
               throw new Error("Project exceeds the 10 MB import limit.");
             const doc = parseProject(await picked.text());
-            void switchWorkspace(() =>
-              useEditor.getState().load({ ...doc, id: createId() }),
-            );
+            void projectActions.importProject(doc);
           } catch {
             notifications.show({
               color: "red",
               title: "Import failed",
               message:
-                "Choose a valid version 1–5 PatternAki JSON project under 10 MB. Your current pattern is unchanged.",
+                "Choose a valid version 1–9 PatternAki JSON project under 10 MB. Your current pattern is unchanged.",
             });
           }
         }}

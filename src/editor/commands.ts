@@ -159,6 +159,7 @@ export const commands = {
   openProject: localCommand("project.open", "Open saved project…"),
   renameProjectDialog: localCommand("project.rename-dialog", "Rename project…"),
   deleteProject: localCommand("project.delete", "Delete saved project…"),
+  recoveryCopy: localCommand("project.recovery-copy", "Save recovery copy…"),
   importProject: localCommand("project.import", "Import JSON…"),
   save: localCommand("project.save", "Save locally", [{ key: "s", mod: true }]),
   exportPdf: localCommand("project.export-pdf", "Export actual-size PDF…"),

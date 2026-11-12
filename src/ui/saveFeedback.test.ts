@@ -6,6 +6,7 @@ describe("M0.2 save feedback", () => {
     expect(saveKind("Unsaved")).toBe("dirty");
     expect(saveKind("Unsaved changes")).toBe("dirty");
     expect(saveKind("Saving…")).toBe("saving");
+    expect(saveKind("Deleting project…")).toBe("saving");
     expect(saveKind("Saved locally")).toBe("saved");
   });
   it("makes quota and startup failures actionable", () => {
@@ -13,5 +14,8 @@ describe("M0.2 save feedback", () => {
       "error",
     );
     expect(saveKind("Could not open local storage.")).toBe("error");
+    expect(saveKind("Conflict: another tab changed this project.")).toBe(
+      "error",
+    );
   });
 });

@@ -176,13 +176,15 @@ Implementation and verification, 2026-11-12: pinned pdf-lib 1.17.1; canonical ve
 
 ### M4.1 Project manager and persistence safety [P0]
 
-- [ ] Add a project browser for all saved IndexedDB projects: create, open, rename, duplicate, delete with confirmation, and a clear most-recently-edited listing. Existing latest-project restore remains the default quick start.
-- [ ] Persist project-local settings (display units, snap toggles, last active project) and workspace settings (theme/inspector layout), using appropriate small preference records.
-- [ ] Add optional recovery checkpoints for last known good committed states, plus a restore flow after a crash/storage error. Never treat an unfinished drag as committed work.
-- [ ] Guard against cross-tab editing of the same project. Detect stale revisions; refuse silent last-writer-wins overwrites and offer recover/export options.
-- [ ] Test ordered saves under rapid edits/switches, IndexedDB quota failures, corrupted stored documents, failed imports, and migrations. Preserve the in-memory document and offer JSON export if persistence fails.
-- [ ] Request persistent storage via `navigator.storage.persist()` where supported, explain refusal/eviction risk, and don't promise permanent storage.
-- [ ] Verify `Ctrl/Cmd+S`, project switching, and close/reload transitions preserve committed work. Warn before leaving if there are **uncommitted** edits that cannot yet be saved; don't rely on asynchronous `beforeunload` writes.
+- [x] Add a project browser for all saved IndexedDB projects: create, open, rename, duplicate, delete with confirmation, and a clear most-recently-edited listing. Existing latest-project restore remains the default quick start.
+- [x] Persist project-local settings (display units, snap toggles, last active project) and workspace settings (theme/inspector layout), using appropriate small preference records.
+- [x] Add optional recovery checkpoints for last known good committed states, plus a restore flow after a crash/storage error. Never treat an unfinished drag as committed work.
+- [x] Guard against cross-tab editing of the same project. Detect stale revisions; refuse silent last-writer-wins overwrites and offer recover/export options.
+- [x] Test ordered saves under rapid edits/switches, IndexedDB quota failures, corrupted stored documents, failed imports, and migrations. Preserve the in-memory document and offer JSON export if persistence fails.
+- [x] Request persistent storage via `navigator.storage.persist()` where supported, explain refusal/eviction risk, and don't promise permanent storage.
+- [x] Verify `Ctrl/Cmd+S`, project switching, and close/reload transitions preserve committed work. Warn before leaving if there are **uncommitted** edits that cannot yet be saved; don't rely on asynchronous `beforeunload` writes.
+
+Implementation and verification, 2026-11-12: a most-recently-edited catalog supports named creation, open/reload, current/inactive rename, independent duplication, confirmed deletion, source JSON backup and checkpoint recovery copies. Database v3 explicitly migrates wrapper revisions and per-project preferences without rewriting document bodies; document schema 9 is unchanged. Atomic revision/fingerprint checks reject stale writers and deleted-record resurrection, including two live tabs. Project geometry, preferences and enabled checkpoints save or roll back together. Last-active/workspace preferences, optional five-state recovery, persistent-storage request outcomes, stale save-status guards and real beforeunload warnings are verified. All 508 unit tests pass. Eleven installed-Chromium scenarios verified across regression and targeted deletion runs cover M4.1 plus existing save/open and SVG downloads, including quota injection, unsupported imports/primary records, geometry-preserving recovery, project preferences, theme/layout, asynchronous switching, edits arriving during deletion, replacement-storage failure after deletion, and persistence refusal at phone width. Cross-engine/physical-device and offline/PWA acceptance remain M4.2/M5. See README for checkpoint retention, conflict resolution and browser-storage limits.
 
 ### M4.2 Installable offline PWA [P1]
 

@@ -1,4 +1,8 @@
-function downloadFile(blob: Blob, name: string, extension: "svg" | "pdf") {
+export function downloadFile(
+  blob: Blob,
+  name: string,
+  extension: "svg" | "pdf" | "json",
+) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   try {

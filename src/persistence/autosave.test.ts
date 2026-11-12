@@ -1,89 +1,87 @@
+import "fake-indexeddb/auto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-const mock = vi.hoisted(() => {
-  const state = {
-    document: { id: "p1", name: "Test" },
-    revision: 1,
-    ready: true,
-    saveStatus: "Unsaved",
-  };
-  return {
-    state,
-    saveProject: vi.fn(),
-  };
-});
-
-vi.mock("../editor/store", () => ({
-  useEditor: {
-    getState: () => mock.state,
-    setState: (patch: { saveStatus: string }) =>
-      Object.assign(mock.state, patch),
-  },
-}));
-vi.mock("./projects", () => ({
+import { useEditor } from "../editor/store";
+import { defaultSettings } from "../editor/settings";
+import { emptyDocument } from "../document/schema";
+const mock = vi.hoisted(() => ({ saveProject: vi.fn() }));
+vi.mock("./projects", async (original) => ({
+  ...(await original<typeof import("./projects")>()),
   saveProject: mock.saveProject,
-  latestProject: vi.fn(),
-  loadEditorSettings: vi.fn(),
-  saveEditorSettings: vi.fn(),
 }));
-
-import { saveNow } from "./autosave";
-
-describe("M0.2 save status and recovery", () => {
+import { saveNow, needsLeaveWarning } from "./autosave";
+describe("save status and committed-state protection", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    mock.state.document.id = "p1";
-    mock.state.revision = 1;
-    mock.state.ready = true;
-    mock.state.saveStatus = "Unsaved";
+    vi.resetAllMocks();
+    useEditor.getState().load(emptyDocument("p1"));
+    useEditor.setState({ ...structuredClone(defaultSettings), ready: true });
   });
-
-  it("moves from saving to saved when the current revision was persisted", async () => {
+  it("saves geometry and project preferences from one snapshot", async () => {
     mock.saveProject.mockResolvedValue(undefined);
+    useEditor.setState({ snap: false });
     const result = saveNow();
-    expect(mock.state.saveStatus).toBe("Saving…");
+    expect(useEditor.getState().saveStatus).toBe("Saving…");
     expect(await result).toBe(true);
-    expect(mock.state.saveStatus).toBe("Saved locally");
+    expect(mock.saveProject).toHaveBeenCalledWith(
+      useEditor.getState().document,
+      expect.objectContaining({ snap: false }),
+    );
+    expect(needsLeaveWarning()).toBe(false);
   });
-
-  it("preserves a failure state until an explicit successful retry", async () => {
+  it("preserves failure state until a successful retry", async () => {
     mock.saveProject.mockRejectedValueOnce(new Error("QuotaExceededError"));
     expect(await saveNow()).toBe(false);
-    expect(mock.state.saveStatus).toMatch(/Save failed/);
+    expect(useEditor.getState().saveStatus).toMatch(
+      /Save failed.*QuotaExceededError/,
+    );
+    expect(needsLeaveWarning()).toBe(true);
     mock.saveProject.mockResolvedValueOnce(undefined);
     expect(await saveNow()).toBe(true);
-    expect(mock.state.saveStatus).toBe("Saved locally");
   });
-
-  it("cannot mark a newer revision saved or approve a stale switch", async () => {
+  it("does not approve switching after a newer document or preference edit", async () => {
     let release!: () => void;
-    mock.saveProject.mockImplementationOnce(
+    mock.saveProject.mockImplementation(
       () =>
         new Promise<void>((resolve) => {
           release = resolve;
         }),
     );
-    const pending = saveNow();
-    mock.state.revision = 2;
-    mock.state.saveStatus = "Unsaved";
+    const first = saveNow();
+    useEditor
+      .getState()
+      .commit({ ...useEditor.getState().document, name: "New revision" });
     release();
-    expect(await pending).toBe(false);
-    expect(mock.state.saveStatus).toBe("Unsaved");
+    expect(await first).toBe(false);
+    const second = saveNow();
+    useEditor.setState({ snap: false });
+    release();
+    expect(await second).toBe(false);
   });
-
-  it("does not overwrite status for a newer project when an older write fails", async () => {
-    let fail!: (error: Error) => void;
-    mock.saveProject.mockImplementationOnce(
+  it("does not overwrite another project's status when an old write fails", async () => {
+    let fail!: (cause: Error) => void;
+    mock.saveProject.mockImplementation(
       () =>
         new Promise<void>((_resolve, reject) => {
           fail = reject;
         }),
     );
     const pending = saveNow();
-    mock.state.document.id = "p2";
-    mock.state.saveStatus = "Unsaved";
+    useEditor.getState().load(emptyDocument("p2"));
     fail(new Error("Storage unavailable"));
     expect(await pending).toBe(false);
-    expect(mock.state.saveStatus).toBe("Unsaved");
+    expect(useEditor.getState().saveStatus).toBe("Unsaved");
+  });
+  it("warns about unfinished drags/drafts without ever passing previews to persistence", async () => {
+    mock.saveProject.mockResolvedValue(undefined);
+    const committed = useEditor.getState().document;
+    useEditor.setState({
+      preview: { ...committed, name: "Transient" },
+      hasDraft: true,
+      gestureActive: true,
+    });
+    expect(await saveNow()).toBe(true);
+    expect(mock.saveProject.mock.calls[0][0]).toEqual(committed);
+    expect(needsLeaveWarning()).toBe(true);
+    useEditor.getState().cancel();
+    expect(needsLeaveWarning()).toBe(false);
   });
 });

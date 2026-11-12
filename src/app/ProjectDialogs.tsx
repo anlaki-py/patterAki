@@ -1,86 +1,47 @@
 import { useEffect, useState } from "react";
 import {
   Button,
+  Checkbox,
   Group,
   Stack,
   Text,
-  TextInput,
   ScrollArea,
 } from "@mantine/core";
-import { commands } from "../editor/commands";
+import { useEditor } from "../editor/store";
 import {
   listSavedProjects,
   type SavedProject,
 } from "../persistence/projectBrowser";
+import {
+  recoveryEnabled,
+  setRecoveryEnabled,
+} from "../persistence/preferences";
+import { onProjectWrite } from "../persistence/repository";
+import { requestStorageProtection } from "../persistence/storageProtection";
 
-export function RenameProjectDialog({
-  name,
-  onClose,
-}: {
-  name: string;
-  onClose: () => void;
-}) {
-  const [value, setValue] = useState(name);
-  const valid = commands.rename.bind(value.trim()).enabled();
-  const submit = () => {
-    if (!valid) return;
-    commands.rename.bind(value.trim()).run();
-    onClose();
-  };
-  return (
-    <Stack gap="sm">
-      <TextInput
-        label="Project name"
-        autoFocus
-        value={value}
-        maxLength={120}
-        onChange={(event) => setValue(event.currentTarget.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            submit();
-          }
-          if (event.key === "Escape") {
-            event.stopPropagation();
-            onClose();
-          }
-        }}
-        error={
-          !valid && value.length > 0
-            ? "Enter a name of 1–120 characters."
-            : undefined
-        }
-      />
-      <Group justify="flex-end">
-        <Button variant="default" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button onClick={submit} disabled={!valid}>
-          Rename
-        </Button>
-      </Group>
-    </Stack>
-  );
-}
-
+export type ProjectBrowserActions = {
+  create: () => void;
+  open: (id: string) => Promise<boolean>;
+  rename: (id: string) => Promise<void>;
+  duplicate: (id: string) => Promise<void>;
+  remove: (id: string, refresh: () => void) => Promise<void>;
+  recover: (id: string) => Promise<void>;
+  exportStored: (id: string) => Promise<void>;
+};
 export function SavedProjectsDialog({
-  currentId,
-  onOpen,
-  onDelete,
+  actions,
 }: {
-  currentId: string;
-  onOpen: (id: string) => Promise<boolean>;
-  onDelete: (id: string, refresh: () => void) => void;
+  actions: ProjectBrowserActions;
 }) {
-  const [items, setItems] = useState<SavedProject[]>([]);
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
+  const currentId = useEditor((s) => s.document.id);
+  const [items, setItems] = useState<SavedProject[]>([]),
+    [error, setError] = useState("");
+  const [busy, setBusy] = useState(false),
+    [checkpoints, setCheckpoints] = useState(true),
+    [protection, setProtection] = useState("");
   const reload = () => {
     void listSavedProjects()
-      .then((result) => {
-        setItems(result);
-        setError("");
-      })
+      .then(setItems)
       .catch((cause: unknown) =>
         setError(
           cause instanceof Error
@@ -90,30 +51,91 @@ export function SavedProjectsDialog({
       );
   };
   useEffect(() => {
-    // Keep async reads from updating a closed modal.
     let active = true;
-    void listSavedProjects()
-      .then((result) => {
-        if (active) setItems(result);
+    const failure = (cause: unknown) => {
+      if (active)
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : "Could not read local projects.",
+        );
+    };
+    const refresh = () => {
+      void listSavedProjects()
+        .then((rows) => {
+          if (active) setItems(rows);
+        })
+        .catch(failure);
+    };
+    refresh();
+    void recoveryEnabled()
+      .then((enabled) => {
+        if (active) setCheckpoints(enabled);
       })
-      .catch((cause: unknown) => {
-        if (active)
-          setError(
-            cause instanceof Error
-              ? cause.message
-              : "Could not read local projects.",
-          );
-      });
+      .catch(failure);
+    const stop = onProjectWrite(refresh);
     return () => {
       active = false;
+      stop();
     };
   }, []);
+  const run = async (action: () => Promise<unknown>) => {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      await action();
+      reload();
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Could not complete project action.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
     <Stack gap="xs">
-      <Text size="xs" c="dimmed">
-        Projects stay in this browser's local storage. Export JSON to keep a
-        separate backup.
+      <Text size="xs">
+        Most recently edited first. Projects stay in this browser; keep JSON
+        backups. Open a recovery checkpoint as a separate project, or export a
+        damaged record before deleting it.
       </Text>
+      <Group>
+        <Button onClick={actions.create} disabled={busy}>
+          Create project
+        </Button>
+        <Button
+          variant="default"
+          disabled={busy}
+          onClick={() =>
+            void run(async () =>
+              setProtection(await requestStorageProtection()),
+            )
+          }
+        >
+          Protect local storage
+        </Button>
+      </Group>
+      <Checkbox
+        label="Keep last five recovery checkpoints"
+        checked={checkpoints}
+        disabled={busy}
+        onChange={(event) => {
+          const enabled = event.currentTarget.checked;
+          void run(async () => {
+            await setRecoveryEnabled(enabled);
+            setCheckpoints(enabled);
+          });
+        }}
+      />
+      {protection && (
+        <Text role="status" size="xs">
+          {protection}
+        </Text>
+      )}
       {error && (
         <Text c="red" size="sm" role="alert">
           {error}
@@ -122,45 +144,82 @@ export function SavedProjectsDialog({
       {items.length === 0 && !error && (
         <Text size="sm">No saved projects yet.</Text>
       )}
-      <ScrollArea.Autosize mah={380}>
+      <ScrollArea.Autosize mah={420}>
         <Stack gap="xs">
           {items.map((project) => (
-            <Group
-              key={project.id}
-              justify="space-between"
-              wrap="nowrap"
-              gap="xs"
-            >
-              <Stack gap={0} style={{ minWidth: 0, flex: 1 }}>
-                <Text size="sm" truncate>
-                  {project.name}
-                  {project.id === currentId ? " (current)" : ""}
+            <Stack key={project.id} gap={4} data-project-row={project.id}>
+              <Group justify="space-between" wrap="nowrap" gap="xs">
+                <Stack gap={0} style={{ minWidth: 0, flex: 1 }}>
+                  <Text size="sm" truncate>
+                    {project.name}
+                    {project.id === currentId ? " (current)" : ""}
+                  </Text>
+                  <Text size="xs" c="dimmed">
+                    {new Date(project.updatedAt).toLocaleString()}
+                  </Text>
+                </Stack>
+                <Button
+                  size="xs"
+                  variant="default"
+                  disabled={busy || !!project.issue}
+                  onClick={() => void run(() => actions.open(project.id))}
+                >
+                  {project.id === currentId ? "Reload" : "Open"}
+                </Button>
+                <Button
+                  size="xs"
+                  color="red"
+                  variant="subtle"
+                  disabled={busy}
+                  onClick={() =>
+                    void run(() => actions.remove(project.id, reload))
+                  }
+                >
+                  Delete
+                </Button>
+              </Group>
+              {project.issue && (
+                <Text size="xs" c="red">
+                  {project.issue}
                 </Text>
-                <Text size="xs" c="dimmed">
-                  {new Date(project.updatedAt).toLocaleString()}
-                </Text>
-              </Stack>
-              <Button
-                size="xs"
-                variant="default"
-                disabled={busy || project.id === currentId}
-                onClick={() => {
-                  setBusy(true);
-                  void onOpen(project.id).finally(() => setBusy(false));
-                }}
-              >
-                Open
-              </Button>
-              <Button
-                size="xs"
-                color="red"
-                variant="subtle"
-                disabled={busy}
-                onClick={() => onDelete(project.id, reload)}
-              >
-                Delete
-              </Button>
-            </Group>
+              )}
+              <Group gap="xs">
+                <Button
+                  size="compact-xs"
+                  variant="subtle"
+                  disabled={busy || !!project.issue}
+                  onClick={() => void run(() => actions.rename(project.id))}
+                >
+                  Rename
+                </Button>
+                <Button
+                  size="compact-xs"
+                  variant="subtle"
+                  disabled={busy || !!project.issue}
+                  onClick={() => void run(() => actions.duplicate(project.id))}
+                >
+                  Duplicate
+                </Button>
+                <Button
+                  size="compact-xs"
+                  variant="subtle"
+                  disabled={busy}
+                  onClick={() => void run(() => actions.recover(project.id))}
+                >
+                  Recovery
+                </Button>
+                <Button
+                  size="compact-xs"
+                  variant="subtle"
+                  disabled={busy}
+                  onClick={() =>
+                    void run(() => actions.exportStored(project.id))
+                  }
+                >
+                  Export stored JSON
+                </Button>
+              </Group>
+            </Stack>
           ))}
         </Stack>
       </ScrollArea.Autosize>
