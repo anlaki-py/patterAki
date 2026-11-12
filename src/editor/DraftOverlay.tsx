@@ -4,7 +4,6 @@ import { formatLength, type PatternDocument } from "../document/schema";
 
 export function DraftOverlay({
   draft,
-  tangents,
   end,
   rectangle,
   scale,
@@ -12,7 +11,6 @@ export function DraftOverlay({
   focusExact,
 }: {
   draft: Vec2[];
-  tangents?: ReadonlyMap<number, Vec2>;
   end: Vec2;
   rectangle?: { width: number; height: number } | null;
   scale: number;
@@ -51,20 +49,7 @@ export function DraftOverlay({
     <>
       <path
         d={[...draft, end]
-          .map((p, i, all) => {
-            if (!i) return `M ${p.x} ${p.y}`;
-            const a = all[i - 1],
-              t = tangents?.get(i - 1),
-              u = tangents?.get(i);
-            if (!t && !u) return `L ${p.x} ${p.y}`;
-            const c = t
-              ? { x: a.x + t.x, y: a.y + t.y }
-              : { x: a.x + (p.x - a.x) / 3, y: a.y + (p.y - a.y) / 3 };
-            const d = u
-              ? { x: p.x - u.x, y: p.y - u.y }
-              : { x: p.x - (p.x - a.x) / 3, y: p.y - (p.y - a.y) / 3 };
-            return `C ${c.x} ${c.y} ${d.x} ${d.y} ${p.x} ${p.y}`;
-          })
+          .map((p, i) => `${i ? "L" : "M"} ${p.x} ${p.y}`)
           .join(" ")}
         className="draft-line"
         fill="none"

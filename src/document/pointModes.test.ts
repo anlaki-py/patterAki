@@ -1,8 +1,7 @@
 import { expect, it } from "vitest";
 import { addPath } from "./operations";
 import { emptyDocument, parseProject } from "./schema";
-import { moveHandle, setPointMode, moveVertex } from "./curves";
-import { applyDraftTangents } from "./curveDraft";
+import { bendCurve, moveHandle, setPointMode, moveVertex } from "./curves";
 import { useEditor } from "../editor/store";
 
 function fixture() {
@@ -16,7 +15,7 @@ function fixture() {
     String(++id),
   );
   const edges = Object.values(doc.segments);
-  return { doc, edges, shared: edges[0].to, positions };
+  return { doc, edges, shared: edges[0].to };
 }
 it("smooth preserves opposite arm length; symmetric matches length; Alt decouples", () => {
   const { doc, edges, shared } = fixture();
@@ -58,22 +57,12 @@ it("corner leaves neighbours independent and rejects linked branch points", () =
   };
   expect(() => setPointMode(branched, shared, "smooth")).toThrow("at most two");
 });
-it("draft tangents create symmetric adjacent cubics and commit as one undo step", () => {
-  const { doc, positions, edges, shared } = fixture();
-  const next = applyDraftTangents(
-    doc,
-    positions,
-    new Map([[1, { x: 10, y: 20 }]]),
-  );
-  expect(next.points[shared].mode).toBe("symmetric");
-  expect(next.segments[edges[0].id]).toMatchObject({
-    kind: "cubic",
-    control2: { x: 50, y: -20 },
-  });
-  expect(next.segments[edges[1].id]).toMatchObject({
-    kind: "cubic",
-    control1: { x: 70, y: 20 },
-  });
+it("explicit curve bending preserves neighboring straight segments and commits one history entry", () => {
+  const { doc, edges } = fixture();
+  const next = bendCurve(doc, edges[0].id, 0.5, { x: 0, y: 20 });
+  expect(next.segments[edges[0].id].kind).toBe("cubic");
+  expect(next.segments[edges[1].id]).toEqual(doc.segments[edges[1].id]);
+  expect(next.points).toEqual(doc.points);
   useEditor.getState().load(doc);
   useEditor.setState({ preview: next });
   useEditor.getState().cancel();

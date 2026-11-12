@@ -175,7 +175,7 @@ export function CanvasContextMenu({
         trapFocus
         returnFocus={false}
       >
-        <Menu.ContextMenu>
+        <Menu.ContextMenu disabled={s.hasDraft}>
           {cloneElement(children, {
             onTouchStart: (event) => {
               const touch = event.touches[0];
@@ -185,6 +185,10 @@ export function CanvasContextMenu({
               touchPoint.current = null;
             },
             onContextMenu: (event) => {
+              if (useEditor.getState().hasDraft) {
+                event.preventDefault();
+                return;
+              }
               touchPoint.current = null;
               const point = position(event),
                 element = event.target as SVGElement;

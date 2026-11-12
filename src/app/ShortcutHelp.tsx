@@ -14,7 +14,7 @@ const toolHints: Record<Tool, string> = {
     "Select: click an item; Shift-click to extend selection. Drag the selected edge or drag empty space to box-select.",
   line: "Line: click start and end. Use the numeric length and angle inputs to set exact dimensions.",
   polyline:
-    "Polyline: click successive points; Enter or Finish line commits; click the first point to close.",
+    "Polyline: click successive points for straight segments; Enter or Finish line commits; click the first point to close. Use Curve (C) afterward to bend an edge.",
   rectangle:
     "Rectangle: choose an origin, enter exact width and height, then create the rectangle.",
   curve: "Curve: drag an edge to bend it, then drag its handles.",
