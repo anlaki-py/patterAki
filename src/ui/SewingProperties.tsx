@@ -68,8 +68,8 @@ export function SewingProperties({ piece }: { piece: PatternPiece }) {
           <Accordion.Panel>
             <Stack gap="xs">
               <Text size="xs">
-                The source loop is the stitch outline. Cut offsets are derived
-                in M3. Fold edges default to 0 mm allowance.
+                The source loop is the stitch outline. Cut offsets derive from
+                Seam allowance settings. Fold edges default to 0 mm allowance.
               </Text>
               <Select
                 label="Sewing edge"

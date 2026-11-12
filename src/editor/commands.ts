@@ -1,3 +1,4 @@
+import { seamCommands } from "./seamCommands";
 import { sewingCommands } from "./sewingCommands";
 import { pieceEdges } from "../document/pieces";
 import { pieceCommands } from "./pieceCommands";
@@ -85,6 +86,8 @@ export const nudgeCommands = nudgeDirections.flatMap(
   ],
 );
 export const commands = {
+  ...seamCommands,
+  openSeam: localCommand("seam.open", "Seam allowance…"),
   ...geometryCommands,
   ...pieceCommands,
   ...sewingCommands,

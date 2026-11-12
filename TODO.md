@@ -22,10 +22,10 @@
 - [x] Exact straight-line length change with **Start / Center / End** fixed and preview; point insertion and exact A/B distances, including Bézier arc-distance placement; explicit creation of intersection points.
 - [x] Cubic Bézier edge bending, independent handles, exact de Casteljau split, adaptive arc-length measurements, and straighten/reset operations.
 - [x] Editable text, arrow, grainline, fold guide, and drill-point **visual marks**, including selection, movement, rotation, undo, and persistence. Free annotations retain those editors; M2.2 adds optional sewing attachments.
-- [x] Debounced, ordered IndexedDB autosave; latest project restore; manual save; lossless JSON export; Zod-validated JSON import; schema v1–v7 migration to current schema v8.
+- [x] Debounced, ordered IndexedDB autosave; latest project restore; manual save; lossless JSON export; Zod-validated JSON import; schema v1–v8 migration to current schema v9.
 - [x] Existing unit tests and CI checks. **Not equivalent to browser or end-to-end verification.**
 
-**Current limitations to respect:** closed polylines remain drafting paths until explicitly converted to basic `PatternPiece` identities; most marks are standalone annotations; no production cut contour, calibrated PDF output or installed/offline PWA yet. M2.2 provides physical-size sewing SVG output. The M1.2 Playwright suite uses installed Chromium. Preserve and migrate all existing schema-v4 projects when extending the model.
+**Current limitations to respect:** closed polylines remain drafting paths until explicitly converted to basic `PatternPiece` identities; most marks are standalone annotations; no cut-layer export, calibrated PDF output or installed/offline PWA yet. M2.2 provides physical-size sewing SVG output. The M1.2 Playwright suite uses installed Chromium. Preserve and migrate all existing schema-v4 projects when extending the model.
 
 ---
 
@@ -84,7 +84,7 @@ Implementation and automated verification completed 2026-11-11. Unit coverage in
 - [x] Show arc length vs chord clearly and ensure any numeric curve edit labels the exact quantity it changes. Do **not** claim arc-length editing if only the chord is modified.
 - [x] Warn if a bend makes a closed contour invalid or later makes a seam offset impossible. Cancel must restore original geometry and one bend must create one history entry.
 
-Implementation: schema v6 introduced point modes, retained in v7, with validated v1–v5 migration. Closed-contour rejection is active; offset feasibility remains unavailable until M3 and is explicitly identified in Properties. Straight Line/Polyline placement is verified separately from explicit Curve editing. Chromium tests cover open and closed polylines with pointer drift, numeric entry, Escape, undo/redo, touch-event movement and explicit bending after placement. Active-point handles, Alt decoupling, physical touch devices and the full 25%–400% zoom range still need acceptance.
+Implementation: schema v6 introduced point modes, retained in v7, with validated v1–v5 migration. Closed-contour rejection is active; offset feasibility is now checked by M3.1 during source previews. Straight Line/Polyline placement is verified separately from explicit Curve editing. Chromium tests cover open and closed polylines with pointer drift, numeric entry, Escape, undo/redo, touch-event movement and explicit bending after placement. Active-point handles, Alt decoupling, physical touch devices and the full 25%–400% zoom range still need acceptance.
 
 Polyline placement correction, 2026-11-12: removed implicit anchor tangent capture and curved draft previews from both placement tools, including the obsolete tangent application code. A browser regression first reproduced cubic previews from small pointer drift; the fixed cases cover open/closed finish, numeric dimensions, cancellation, history and touch. The active-draft context menu guard also prevents a long press from cancelling an unfinished path. Existing saved curves and explicit Curve-tool editing remain supported. All 421 unit tests, lint, formatting and build pass. All 22 Chromium browser scenarios were verified; an existing contour test passed on an isolated retry after hitting the 30-second limit during the initial combined checks.
 
@@ -139,13 +139,15 @@ Correction 2026-11-11: the previous all-checked state overstated completion. The
 
 ### M3.1 Real, non-destructive seam offsets
 
-- [ ] Add a seam-allowance property per piece, in **mm**, initially uniform; support per-edge overrides and miter/round/bevel joins after the uniform engine is reliable.
-- [ ] Compute the **cut outline** as derived geometry from the untouched **stitching outline**. Never fake allowance using SVG `stroke-width` or move the source seam to make the cut line.
-- [ ] Handle straight edges and cubic curves with documented approximation bounds or a verified geometry library; confirm actual API support before adopting Paper.js or an offset library.
-- [ ] Support convex/concave corners, acute joins, correct outward side for either winding, close curves, zero-width fold edges, and safe errors for impossible/self-crossing offsets. Avoid unbounded miter spikes.
-- [ ] Show live offset preview and width controls; allow separate Stitch / Cut / Both visibility. Changes to source geometry recalculate cut geometry deterministically.
-- [ ] Keep derived contours out of editable canonical document data and out of undo history except for the user action changing source settings. Cache only if invalidation is correct.
-- [ ] Unit-test rectangle and mixed curve/line fixtures; cover near-degenerate cases, closed-contour validity, extreme sizes, and repeated save/undo/redo.
+- [x] Add a seam-allowance property per piece, in **mm**, initially uniform; support per-edge overrides and miter/round/bevel joins after the uniform engine is reliable.
+- [x] Compute the **cut outline** as derived geometry from the untouched **stitching outline**. Never fake allowance using SVG `stroke-width` or move the source seam to make the cut line.
+- [x] Handle straight edges and cubic curves with documented approximation bounds or a verified geometry library; confirm actual API support before adopting Paper.js or an offset library.
+- [x] Support convex/concave corners, acute joins, correct outward side for either winding, close curves, zero-width fold edges, and safe errors for impossible/self-crossing offsets. Avoid unbounded miter spikes.
+- [x] Show live offset preview and width controls; allow separate Stitch / Cut / Both visibility. Changes to source geometry recalculate cut geometry deterministically.
+- [x] Keep derived contours out of editable canonical document data and out of undo history except for the user action changing source settings. Cache only if invalidation is correct.
+- [x] Unit-test rectangle and mixed curve/line fixtures; cover near-degenerate cases, closed-contour validity, extreme sizes, and repeated save/undo/redo.
+
+Implementation and verification, 2026-11-12: pure mm offset engine, schema v9 migration, bounded adaptive cubic flattening, per-edge sewing overrides, three join policies with bounded miters, explicit failure handling, live Apply/Cancel preview and Stitch/Cut/Both visibility. Numerical, history, migration, IndexedDB and installed Chromium desktop/phone checks cover the milestone. Cut-layer export remains M3.2; PDF remains M3.3. See README for tolerance and unsupported offset topology.
 
 ### M3.2 Vector SVG export
 

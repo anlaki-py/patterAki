@@ -1,3 +1,8 @@
+import { edgeAllowance } from "../document/sewing";
+import { formatLength } from "../document/schema";
+import { segmentPoint } from "../document/segments";
+import { useEditor } from "./store";
+import { cutPath } from "../document/seamAllowance";
 import { SvgSewing } from "./SvgSewing";
 import { roleDash } from "../document/sewingDrawing";
 import {
@@ -30,6 +35,8 @@ export function SvgGeometry({
   interactivePoints?: boolean;
   showHandles?: boolean;
 }) {
+  const mode = useEditor((s) => s.outlineVisibility);
+  const previewing = useEditor((s) => !!s.preview);
   const allPieces = Object.values(doc.pieces);
   doc = visibleDocument(doc);
   const selected =
@@ -71,6 +78,61 @@ export function SvgGeometry({
             </title>
           </path>
         ))}
+      {mode !== "stitch" &&
+        allPieces
+          .filter((p) => p.visible)
+          .map((piece) => {
+            try {
+              const ref =
+                piece.stitchingOutline.find((r) =>
+                  selection.has(r.segmentId),
+                ) ?? piece.stitchingOutline[0];
+              const midpoint = segmentPoint(
+                doc,
+                doc.segments[ref.segmentId],
+                0.5,
+              );
+              return (
+                <g key={`cut-${piece.id}`}>
+                  <path
+                    data-cut={piece.id}
+                    d={cutPath(doc, piece)}
+                    fill="none"
+                    stroke="var(--mantine-color-orange-7)"
+                    strokeWidth={1.5}
+                    vectorEffect="non-scaling-stroke"
+                    pointerEvents="none"
+                  />
+                  {previewing &&
+                    piece.seamAllowance &&
+                    piece.stitchingOutline.some((r) =>
+                      selection.has(r.segmentId),
+                    ) && (
+                      <text
+                        data-seam-width={piece.id}
+                        x={midpoint.x}
+                        y={midpoint.y - 14 / scale}
+                        fontSize={12 / scale}
+                        fill="var(--mantine-color-orange-7)"
+                        pointerEvents="none"
+                      >
+                        Allowance{" "}
+                        {formatLength(
+                          edgeAllowance(
+                            piece,
+                            ref.segmentId,
+                            piece.seamAllowance.widthMm,
+                          ),
+                          doc.unitsDisplay,
+                        )}
+                      </text>
+                    )}
+                </g>
+              );
+            } catch {
+              return null;
+            } // The inspector reports unresolved contours; never render a broken cut path.
+          })}
       <SvgSewing doc={doc} />
       {Object.values(doc.segments).map((edge) => {
         const parent = pieceForItem(doc, edge.id);
@@ -93,6 +155,9 @@ export function SvgGeometry({
               data-role={role}
               strokeDasharray={roleDash(role)}
               className="edge-stroke"
+              visibility={
+                parent && !path && mode === "cut" ? "hidden" : undefined
+              }
               vectorEffect="non-scaling-stroke"
             />
             <path
@@ -119,6 +184,7 @@ export function SvgGeometry({
                 selectedPointSet.has(id) ? "point point-active" : "point"
               }
               pointerEvents="none"
+              visibility={parent && mode === "cut" ? "hidden" : undefined}
             />
             {pointHandlesEnabled &&
               itemEditable(doc, id) &&

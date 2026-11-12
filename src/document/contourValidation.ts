@@ -1,3 +1,4 @@
+import { seamIssue } from "./seamAllowance";
 import {
   outlineArea,
   connectedPath,
@@ -187,6 +188,13 @@ export function validateDocumentEdit(
         ...validateContourSegments(contourSegmentsFor(after, ids)).issues,
       );
   }
+  const offsetIssue = seamIssue(after);
+  if (offsetIssue)
+    issues.push({
+      code: "unknown-topology",
+      segmentIds: [...changed],
+      message: offsetIssue,
+    });
   const afterCycles = documentCycles(after);
   for (const cycle of afterCycles) {
     if (!cycle.segmentIds.some((id) => changed.has(id))) continue;

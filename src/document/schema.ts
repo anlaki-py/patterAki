@@ -281,7 +281,10 @@ const version7Schema = z
   .object({
     ...version6Schema.shape,
     schemaVersion: z.literal(7),
-    pieces: z.record(z.string(), patternPieceSchema.omit({ sewing: true })),
+    pieces: z.record(
+      z.string(),
+      patternPieceSchema.omit({ sewing: true, seamAllowance: true }),
+    ),
   })
   .strict()
   .superRefine((doc, ctx) => {
@@ -359,11 +362,14 @@ const version7Schema = z
     }
   });
 
-const currentSchema = z
+const version8Schema = z
   .object({
     ...version7Schema.shape,
     schemaVersion: z.literal(8),
-    pieces: z.record(z.string(), patternPieceSchema),
+    pieces: z.record(
+      z.string(),
+      patternPieceSchema.omit({ seamAllowance: true }),
+    ),
   })
   .strict()
   .superRefine((doc, ctx) => {
@@ -382,6 +388,30 @@ const currentSchema = z
       for (const issue of topology.error.issues)
         ctx.addIssue({ code: "custom", message: issue.message });
     validateSewing(doc, ctx);
+  });
+
+const currentSchema = z
+  .object({
+    ...version8Schema.shape,
+    schemaVersion: z.literal(9),
+    pieces: z.record(z.string(), patternPieceSchema),
+  })
+  .strict()
+  .superRefine((doc, ctx) => {
+    const legacy = version8Schema.safeParse({
+      ...doc,
+      schemaVersion: 8,
+      pieces: Object.fromEntries(
+        Object.entries(doc.pieces).map(([id, p]) => {
+          const { seamAllowance: _seam, ...rest } = p;
+          void _seam;
+          return [id, rest];
+        }),
+      ),
+    });
+    if (!legacy.success)
+      for (const issue of legacy.error.issues)
+        ctx.addIssue({ code: "custom", message: issue.message });
   });
 
 // Validate each historical representation before migration: malformed v1–v4
@@ -448,13 +478,18 @@ export const documentSchema = z.preprocess((input) => {
   if (candidate.schemaVersion === 7) {
     const legacy = version7Schema.safeParse(candidate);
     if (!legacy.success) return input;
-    return { ...legacy.data, schemaVersion: 8 };
+    candidate = { ...legacy.data, schemaVersion: 8 };
+  }
+  if (candidate.schemaVersion === 8) {
+    const legacy = version8Schema.safeParse(candidate);
+    if (!legacy.success) return input;
+    candidate = { ...legacy.data, schemaVersion: 9 };
   }
   return candidate;
 }, currentSchema);
 export type PatternDocument = z.infer<typeof documentSchema>;
 export const emptyDocument = (id: string): PatternDocument => ({
-  schemaVersion: 8,
+  schemaVersion: 9,
   annotations: {},
   guides: {},
   pieces: {},

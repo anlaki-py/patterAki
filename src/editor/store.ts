@@ -1,3 +1,4 @@
+import { seamIssue } from "../document/seamAllowance";
 import { pieceEdges } from "../document/pieces";
 import type { Anchor } from "../geometry/line";
 import { createId } from "./ids";
@@ -15,6 +16,7 @@ import {
 export type Tool =
   "select" | "line" | "polyline" | "rectangle" | "curve" | "point" | "pan";
 type State = {
+  outlineVisibility: "stitch" | "cut" | "both";
   editPieceId: string | null;
   lengthAnchor: Anchor;
   lengthDialogEdge: string | null;
@@ -56,6 +58,7 @@ type State = {
   applySettings: (settings: EditorSettings) => void;
 };
 export const useEditor = create<State>((set, get) => ({
+  outlineVisibility: "both",
   editPieceId: null,
   lengthAnchor: "start",
   lengthDialogEdge: null,
@@ -79,6 +82,8 @@ export const useEditor = create<State>((set, get) => ({
   commit: (doc) => {
     doc = documentSchema.parse(doc);
     const s = get();
+    const issue = seamIssue(doc);
+    if (issue) throw new Error(issue);
     for (const piece of Object.values(s.document.pieces)) {
       if (!piece.locked && piece.visible) continue;
       for (const id of pieceEdges(s.document, piece)) {

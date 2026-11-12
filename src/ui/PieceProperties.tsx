@@ -1,3 +1,4 @@
+import { SeamProperties } from "./SeamProperties";
 import { SewingProperties, ShapeMenu } from "./SewingProperties";
 import { useState } from "react";
 import {
@@ -127,6 +128,9 @@ export function PieceProperties() {
       <ShapeMenu />
       {ids.length > 1 && (
         <PieceMeasurements document={s.preview ?? s.document} ids={ids} />
+      )}
+      {piece && (
+        <SeamProperties key={`seam-${piece.id}-${s.revision}`} piece={piece} />
       )}
       {piece && <SewingProperties key={piece.id} piece={piece} />}
       {piece && (

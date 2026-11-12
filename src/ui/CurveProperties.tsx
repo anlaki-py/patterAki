@@ -63,8 +63,8 @@ export function CurveProperties() {
       />
       <Text size="xs">
         Arc-length changes are unavailable. Drag the curve handles to reshape
-        it. Seam offset feasibility will be checked when offsets are
-        implemented.
+        it. Cut outlines recalculate during preview; unresolved offsets block
+        the edit.
       </Text>
       <Text size="sm">
         Chord:{" "}
