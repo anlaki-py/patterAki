@@ -1,4 +1,4 @@
-import { itemEditable } from "./pieceAccess";
+import { itemEditable, itemVisible } from "./pieceAccess";
 import { composeTransform } from "./pieceTransforms";
 import { pieceEdges } from "./pieces";
 import { annotationTouchesBox } from "./annotationGeometry";
@@ -14,7 +14,7 @@ import {
 
 export function edgesInBox(doc: PatternDocument, box: Bounds): string[] {
   return Object.values(doc.segments)
-    .filter((edge) => itemEditable(doc, edge.id))
+    .filter((edge) => itemEditable(doc, edge.id) && itemVisible(doc, edge.id))
     .filter((edge) =>
       edge.kind === "cubic"
         ? cubicTouchesBox(asCubic(doc, edge), box)

@@ -1,4 +1,5 @@
 import { itemEditable, pieceForItem } from "./pieceAccess";
+import { cubicLength } from "../geometry/bezier";
 import { asCubic } from "./segments";
 import { splitCubic } from "../geometry/bezier";
 import { moveVertex } from "./curves";
@@ -97,6 +98,7 @@ export function splitLine(
       },
       id,
       edgeId,
+      cubicLength(left) / (cubicLength(left) + cubicLength(right)),
     );
   }
 
@@ -115,6 +117,7 @@ export function splitLine(
     },
     id,
     edgeId,
+    t,
   );
 }
 export function deleteSegments(

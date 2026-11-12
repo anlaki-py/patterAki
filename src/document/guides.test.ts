@@ -78,7 +78,7 @@ it("round-trips guides through editable JSON and migrates a version 3 project", 
   };
   const migrated = parseProject(JSON.stringify(version3));
   expect(migrated).toEqual({ ...doc, guides: {}, pieces: {} });
-  expect(migrated.schemaVersion).toBe(7);
+  expect(migrated.schemaVersion).toBe(8);
   const version2 = {
     schemaVersion: 2,
     id: doc.id,

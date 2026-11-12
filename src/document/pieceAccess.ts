@@ -13,10 +13,33 @@ export function itemEditable(doc: PatternDocument, id: string): boolean {
   return !piece || (piece.visible && !piece.locked);
 }
 export function itemVisible(doc: PatternDocument, id: string): boolean {
-  return pieceForItem(doc, id)?.visible ?? true;
+  const piece = pieceForItem(doc, id);
+  if (!piece) return true;
+  if (!piece.visible) return false;
+  if (
+    piece.stitchingOutline.some((ref) => {
+      const e = doc.segments[ref.segmentId];
+      return ref.segmentId === id || e?.from === id || e?.to === id;
+    })
+  )
+    return true;
+  const path = piece.internalPaths.find((p) =>
+    p.edges.some((ref) => {
+      const e = doc.segments[ref.segmentId];
+      return ref.segmentId === id || e?.from === id || e?.to === id;
+    }),
+  );
+  return !path || piece.sewing?.paths[path.id]?.visible !== false;
 }
 export function visibleDocument(doc: PatternDocument): PatternDocument {
-  if (Object.values(doc.pieces).every((piece) => piece.visible)) return doc;
+  if (
+    Object.values(doc.pieces).every(
+      (piece) =>
+        piece.visible &&
+        !Object.values(piece.sewing?.paths ?? {}).some((path) => !path.visible),
+    )
+  )
+    return doc;
   const segments = Object.fromEntries(
     Object.entries(doc.segments).filter(([id]) => itemVisible(doc, id)),
   );

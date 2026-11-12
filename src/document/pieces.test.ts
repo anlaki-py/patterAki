@@ -70,7 +70,7 @@ it("P02 old v4 projects migrate without inventing pieces", () => {
     guides: drawn.guides,
   };
   const migrated = parseProject(JSON.stringify(previous));
-  expect(migrated.schemaVersion).toBe(7);
+  expect(migrated.schemaVersion).toBe(8);
   expect(migrated.pieces).toEqual({});
   expect(migrated.points).toEqual(drawn.points);
   expect(migrated.segments).toEqual(drawn.segments);

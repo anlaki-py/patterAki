@@ -1,3 +1,4 @@
+import { validateSewing } from "./sewingValidation";
 import {
   patternPieceSchema,
   defaultPieceMetadata,
@@ -276,11 +277,11 @@ const version6Schema = z
   .strict()
   .superRefine(validateCurrentDocument);
 
-const currentSchema = z
+const version7Schema = z
   .object({
     ...version6Schema.shape,
     schemaVersion: z.literal(7),
-    pieces: z.record(z.string(), patternPieceSchema),
+    pieces: z.record(z.string(), patternPieceSchema.omit({ sewing: true })),
   })
   .strict()
   .superRefine((doc, ctx) => {
@@ -358,6 +359,31 @@ const currentSchema = z
     }
   });
 
+const currentSchema = z
+  .object({
+    ...version7Schema.shape,
+    schemaVersion: z.literal(8),
+    pieces: z.record(z.string(), patternPieceSchema),
+  })
+  .strict()
+  .superRefine((doc, ctx) => {
+    const topology = version7Schema.safeParse({
+      ...doc,
+      schemaVersion: 7,
+      pieces: Object.fromEntries(
+        Object.entries(doc.pieces).map(([id, p]) => {
+          const { sewing: _sewing, ...rest } = p;
+          void _sewing;
+          return [id, rest];
+        }),
+      ),
+    });
+    if (!topology.success)
+      for (const issue of topology.error.issues)
+        ctx.addIssue({ code: "custom", message: issue.message });
+    validateSewing(doc, ctx);
+  });
+
 // Validate each historical representation before migration: malformed v1–v4
 // must not be silently accepted, and newer unknown versions are rejected.
 export const documentSchema = z.preprocess((input) => {
@@ -417,13 +443,18 @@ export const documentSchema = z.preprocess((input) => {
     } catch {
       return input;
     }
-    return { ...legacy.data, schemaVersion: 7, pieces };
+    candidate = { ...legacy.data, schemaVersion: 7, pieces };
+  }
+  if (candidate.schemaVersion === 7) {
+    const legacy = version7Schema.safeParse(candidate);
+    if (!legacy.success) return input;
+    return { ...legacy.data, schemaVersion: 8 };
   }
   return candidate;
 }, currentSchema);
 export type PatternDocument = z.infer<typeof documentSchema>;
 export const emptyDocument = (id: string): PatternDocument => ({
-  schemaVersion: 7,
+  schemaVersion: 8,
   annotations: {},
   guides: {},
   pieces: {},

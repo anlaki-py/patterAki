@@ -1,3 +1,5 @@
+import { SvgSewing } from "./SvgSewing";
+import { roleDash } from "../document/sewingDrawing";
 import {
   pieceForItem,
   itemEditable,
@@ -69,7 +71,17 @@ export function SvgGeometry({
             </title>
           </path>
         ))}
+      <SvgSewing doc={doc} />
       {Object.values(doc.segments).map((edge) => {
+        const parent = pieceForItem(doc, edge.id);
+        const path = parent?.internalPaths.find((p) =>
+          p.edges.some((r) => r.segmentId === edge.id),
+        );
+        const setting = path ? parent?.sewing?.paths[path.id] : undefined;
+        if (setting?.visible === false) return null;
+        const role = path
+          ? (setting?.role ?? "construction")
+          : (parent?.sewing?.edges[edge.id]?.role ?? "seam");
         return (
           <g
             key={edge.id}
@@ -78,6 +90,8 @@ export function SvgGeometry({
             <path
               d={segmentPath(doc, edge)}
               fill="none"
+              data-role={role}
+              strokeDasharray={roleDash(role)}
               className="edge-stroke"
               vectorEffect="non-scaling-stroke"
             />

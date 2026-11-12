@@ -502,11 +502,13 @@ export function App() {
       </Group>
       <Drawer
         opened={!!mobile && properties}
-        onClose={() =>
+        onClose={() => {
+          // Mantine handles Escape at window capture before a child modal can stop it.
+          if (document.querySelector('[data-drafting-modal="true"]')) return;
           commands.hideProperties
             .bind({ execute: () => setProperties(false) })
-            .run()
-        }
+            .run();
+        }}
         title="Pattern properties"
         position={mobile ? "bottom" : "right"}
         size={mobile ? "75%" : "sm"}

@@ -1,3 +1,4 @@
+import { splitSewing } from "./sewing";
 import { defaultPieceMetadata, identityTransform } from "./pieceSchema";
 import { orderedOutline } from "./pieceTopology";
 import {
@@ -145,6 +146,22 @@ export function withoutBrokenPieces(doc: PatternDocument): PatternDocument {
         id,
         {
           ...piece,
+          sewing: piece.sewing
+            ? {
+                ...piece.sewing,
+                paths: Object.fromEntries(
+                  Object.entries(piece.sewing.paths).filter(([pathId]) =>
+                    piece.internalPaths.some(
+                      (path) =>
+                        path.id === pathId &&
+                        path.edges.every(
+                          (ref) => !!doc.segments[ref.segmentId],
+                        ),
+                    ),
+                  ),
+                ),
+              }
+            : undefined,
           internalPaths: piece.internalPaths.filter((path) =>
             path.edges.every((ref) => !!doc.segments[ref.segmentId]),
           ),
@@ -159,6 +176,7 @@ export function withSplitPieceEdge(
   doc: PatternDocument,
   original: string,
   added: string,
+  fraction: number,
 ): PatternDocument {
   const split = (refs: PatternPiece["stitchingOutline"]) =>
     refs.flatMap((ref) =>
@@ -174,7 +192,7 @@ export function withSplitPieceEdge(
       Object.entries(doc.pieces).map(([id, piece]) => [
         id,
         {
-          ...piece,
+          ...splitSewing(piece, original, added, fraction),
           stitchingOutline: split(piece.stitchingOutline),
           internalPaths: piece.internalPaths.map((path) => ({
             ...path,

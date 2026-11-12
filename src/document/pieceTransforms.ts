@@ -1,3 +1,4 @@
+import { idAllocator } from "./identity";
 import { cubicPoint } from "../geometry/bezier";
 import type { Vec2 } from "../geometry/line";
 import { asCubic } from "./segments";
@@ -144,25 +145,7 @@ export function duplicatePieces(
   delta: Vec2,
 ): { document: PatternDocument; pieceIds: string[] } {
   let next = structuredClone(doc);
-  const used = new Set([
-    ...Object.keys(doc.points),
-    ...Object.keys(doc.segments),
-    ...Object.keys(doc.annotations),
-    ...Object.keys(doc.guides),
-    ...Object.keys(doc.pieces),
-    ...Object.values(doc.pieces).flatMap((p) =>
-      p.internalPaths.map((path) => path.id),
-    ),
-  ]);
-  const fresh = () => {
-    const id = createId();
-    if (!id || used.has(id))
-      throw new Error(
-        "Duplicate ID generator returned an existing or empty ID.",
-      );
-    used.add(id);
-    return id;
-  };
+  const fresh = idAllocator(doc, createId);
   const result: string[] = [];
   for (const id of new Set(ids)) {
     const source = doc.pieces[id];
@@ -194,6 +177,29 @@ export function duplicatePieces(
       ...structuredClone(source),
       id: pieceId,
       name: `${source.name.slice(0, 115)} copy`,
+      sewing: source.sewing
+        ? {
+            ...structuredClone(source.sewing),
+            edges: Object.fromEntries(
+              Object.entries(source.sewing.edges).map(([key, value]) => [
+                edgeMap.get(key)!,
+                value,
+              ]),
+            ),
+            paths: {},
+            notches: source.sewing.notches.map((n) => ({
+              ...n,
+              id: fresh(),
+              segmentId: edgeMap.get(n.segmentId)!,
+            })),
+            marks: source.sewing.marks.map((m) => ({
+              ...m,
+              id: fresh(),
+              segmentId: m.segmentId ? edgeMap.get(m.segmentId)! : undefined,
+            })),
+            darts: source.sewing.darts.map((d) => ({ ...d, id: fresh() })),
+          }
+        : undefined,
       rootSegmentId: edgeMap.get(source.rootSegmentId)!,
       stitchingOutline: refs(source.stitchingOutline),
       internalPaths: source.internalPaths.map((path) => ({
@@ -202,6 +208,14 @@ export function duplicatePieces(
         edges: refs(path.edges),
       })),
     };
+    if (source.sewing)
+      for (let i = 0; i < source.internalPaths.length; i++) {
+        const setting = source.sewing.paths[source.internalPaths[i].id];
+        if (setting)
+          next.pieces[pieceId].sewing!.paths[
+            next.pieces[pieceId].internalPaths[i].id
+          ] = { ...setting };
+      }
     result.push(pieceId);
   }
   next = transformPieces(next, result, {

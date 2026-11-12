@@ -18,6 +18,7 @@ export function DraggableModal({
     <Modal
       opened
       onClose={() => commands.cancelDialog.bind({ execute: onClose }).run()}
+      data-drafting-modal="true"
       size="sm"
       closeOnClickOutside={false}
       transitionProps={{ duration: 0, transition: "fade" }}

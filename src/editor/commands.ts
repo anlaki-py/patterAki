@@ -1,3 +1,4 @@
+import { sewingCommands } from "./sewingCommands";
 import { pieceEdges } from "../document/pieces";
 import { pieceCommands } from "./pieceCommands";
 import { itemEditable } from "../document/pieceAccess";
@@ -86,6 +87,7 @@ export const nudgeCommands = nudgeDirections.flatMap(
 export const commands = {
   ...geometryCommands,
   ...pieceCommands,
+  ...sewingCommands,
   undo: defineCommand(
     "undo",
     "Undo",

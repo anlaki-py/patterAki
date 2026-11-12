@@ -1,3 +1,4 @@
+import { SewingProperties, ShapeMenu } from "./SewingProperties";
 import { useState } from "react";
 import {
   Button,
@@ -96,8 +97,7 @@ function PieceDetails({ piece }: { piece: PatternPiece }) {
         Save piece properties
       </Button>
       <Text size="xs" c="dimmed">
-        Cut metadata is descriptive. Fold-edge allowance and attached marks
-        arrive in M2.2.
+        Designate an On fold edge in Sewing roles to set cutting semantics.
       </Text>
     </Stack>
   );
@@ -124,14 +124,20 @@ export function PieceProperties() {
         Pattern pieces
       </Text>
       <PieceActionsMenu />
+      <ShapeMenu />
       {ids.length > 1 && (
         <PieceMeasurements document={s.preview ?? s.document} ids={ids} />
       )}
+      {piece && <SewingProperties key={piece.id} piece={piece} />}
       {piece && (
         <PieceDetails key={`${piece.id}-${s.revision}`} piece={piece} />
       )}
       <Select
-        label="Internal path parent"
+        label={
+          s.selected.some((id) => !!s.document.annotations[id])
+            ? "Sewing mark parent"
+            : "Internal path parent"
+        }
         placeholder="Choose a piece"
         value={parentId}
         onChange={setParentId}
@@ -139,6 +145,17 @@ export function PieceProperties() {
           .filter((p) => p.visible && !p.locked)
           .map((p) => ({ value: p.id, label: p.name }))}
       />
+      {!piece &&
+        parentId &&
+        s.selected.length === 1 &&
+        ["grainline", "fold"].includes(
+          s.document.annotations[s.selected[0]]?.kind ?? "",
+        ) && (
+          <SewingProperties
+            key={parentId}
+            piece={s.document.pieces[parentId]}
+          />
+        )}
       {parentId && (
         <Button
           variant="default"

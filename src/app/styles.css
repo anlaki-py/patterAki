@@ -369,3 +369,23 @@ svg .guide-preview-line {
 .adjacent-dimension {
   opacity: 0.7;
 }
+
+:root {
+  --draft-construction: var(--mantine-color-gray-6);
+  --draft-fold: var(--mantine-color-teal-7);
+  --draft-placement: var(--mantine-color-violet-7);
+}
+[data-mantine-color-scheme="dark"] {
+  --draft-construction: var(--mantine-color-gray-5);
+  --draft-fold: var(--mantine-color-teal-4);
+  --draft-placement: var(--mantine-color-violet-4);
+}
+.edge:not(.selected):not(:hover) .edge-stroke[data-role="construction"] {
+  stroke: var(--draft-construction);
+}
+.edge:not(.selected):not(:hover) .edge-stroke[data-role="fold"] {
+  stroke: var(--draft-fold);
+}
+.edge:not(.selected):not(:hover) .edge-stroke[data-role="placement"] {
+  stroke: var(--draft-placement);
+}

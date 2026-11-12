@@ -1,3 +1,4 @@
+import { sewingSchema } from "./sewingSchema";
 import { z } from "zod";
 export const outlineEdgeSchema = z
   .object({ segmentId: z.string().min(1), reversed: z.boolean() })
@@ -42,6 +43,7 @@ export const pieceTransformSchema = z
   );
 export const patternPieceSchema = z
   .object({
+    sewing: sewingSchema.optional(),
     version: z.literal(1),
     id: z.string().min(1),
     name: z.string().trim().min(1).max(120),
