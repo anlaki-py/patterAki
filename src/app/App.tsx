@@ -54,6 +54,7 @@ import {
   saveWorkspaceLayout,
 } from "./workspaceLayout";
 import { RenameProjectDialog, SavedProjectsDialog } from "./ProjectDialogs";
+import { PdfExportDialog } from "../ui/PdfExportDialog";
 import { SvgExportDialog } from "../ui/SvgExportDialog";
 import { ShortcutHelp } from "./ShortcutHelp";
 import "./m02.css";
@@ -85,6 +86,7 @@ function exportJson() {
 export function App() {
   const s = useEditor();
   const mobile = useMediaQuery("(max-width: 760px)");
+  const [pdfExport, setPdfExport] = useState(false);
   const [svgExport, setSvgExport] = useState(false);
   const [layout, setLayout] = useState(readWorkspaceLayout);
   const [layoutEpoch, setLayoutEpoch] = useState(0);
@@ -240,6 +242,7 @@ export function App() {
     commands.importProject.bind({ execute: () => file.current?.click() }),
     commands.exportProject.bind({ execute: exportJson }),
     commands.exportSvg.bind({ execute: () => setSvgExport(true) }),
+    commands.exportPdf.bind({ execute: () => setPdfExport(true) }),
     commands.deleteProject.bind({
       execute: () => deleteProject(useEditor.getState().document.id),
     }),
@@ -518,6 +521,7 @@ export function App() {
       >
         <Inspector />
       </Drawer>
+      {pdfExport && <PdfExportDialog onClose={() => setPdfExport(false)} />}
       {svgExport && <SvgExportDialog onClose={() => setSvgExport(false)} />}
       <input
         ref={file}

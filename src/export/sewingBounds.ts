@@ -1,7 +1,7 @@
 import type { PatternDocument, PatternPiece } from "../document/schema";
 import { pieceBounds, applyTransform } from "../document/pieceTransforms";
 import { dartPoints, notchPoint, resolvedMark } from "../document/sewing";
-import { sewingDrawing } from "../document/sewingDrawing";
+import { sewingDrawing, type SewingDrawing } from "../document/sewingDrawing";
 import type { SewingExportOptions } from "./svg";
 export function metadataLines(p: PatternPiece) {
   const m = p.metadata;
@@ -15,11 +15,21 @@ export function metadataLines(p: PatternPiece) {
     line.split(/\r?\n/).flatMap((row) => row.match(/.{1,70}/gu) ?? [""]),
   );
 }
+export function sewingItemRole(piece: PatternPiece, item: SewingDrawing) {
+  return item.role === "dimension"
+    ? (piece.sewing?.marks.find((mark) => `${mark.id}-label` === item.id)
+        ?.kind ?? "dart")
+    : item.role;
+}
+type SewingBoundsOptions = SewingExportOptions & {
+  text?: boolean;
+  roleVisible?: (role: string) => boolean;
+};
 /** Conservative text bounds reserve one em per character without depending on DOM fonts. */
 export function sewingExportBounds(
   doc: PatternDocument,
   ids: string[],
-  options: SewingExportOptions,
+  options: SewingBoundsOptions,
 ) {
   const boundedDoc = { ...doc, pieces: { ...doc.pieces } };
   for (const id of ids) {
@@ -28,7 +38,11 @@ export function sewingExportBounds(
       ...p,
       internalPaths: options.internal
         ? p.internalPaths.filter(
-            (path) => p.sewing?.paths[path.id]?.export !== false,
+            (path) =>
+              p.sewing?.paths[path.id]?.export !== false &&
+              options.roleVisible?.(
+                p.sewing?.paths[path.id]?.role ?? "construction",
+              ) !== false,
           )
         : [],
     };
@@ -44,20 +58,30 @@ export function sewingExportBounds(
     const p = doc.pieces[id];
     if (options.marks) {
       for (const mark of p.sewing?.marks ?? []) {
+        if (options.roleVisible?.(mark.kind) === false) continue;
         const m = resolvedMark(doc, p, mark);
         include(m.position.x, m.position.y, m.lengthMm / 2 + 4);
       }
       for (const notch of p.sewing?.notches ?? []) {
+        if (options.roleVisible?.("notch") === false) continue;
         const n = notchPoint(doc, notch);
         include(n.position.x, n.position.y, notch.depthMm + 2);
       }
-      for (const dart of p.sewing?.darts ?? [])
+      for (const dart of p.sewing?.darts ?? []) {
+        if (options.roleVisible?.("dart") === false) continue;
         for (const point of Object.values(dartPoints(dart))) {
           const world = applyTransform(p.transform, point);
           include(world.x, world.y);
         }
+      }
       for (const item of sewingDrawing(doc, p))
-        if (item.text && item.x !== undefined && item.y !== undefined) {
+        if (
+          options.text !== false &&
+          options.roleVisible?.(sewingItemRole(p, item)) !== false &&
+          item.text &&
+          item.x !== undefined &&
+          item.y !== undefined
+        ) {
           const font = item.fontSize ?? 3;
           include(item.x, item.y - font);
           include(item.x + item.text.length * font, item.y + font);

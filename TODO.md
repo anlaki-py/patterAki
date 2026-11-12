@@ -25,7 +25,7 @@
 - [x] Debounced, ordered IndexedDB autosave; latest project restore; manual save; lossless JSON export; Zod-validated JSON import; schema v1–v8 migration to current schema v9.
 - [x] Existing unit tests and CI checks. **Not equivalent to browser or end-to-end verification.**
 
-**Current limitations to respect:** closed polylines remain drafting paths until explicitly converted to basic `PatternPiece` identities; most marks are standalone annotations; no calibrated PDF output or installed/offline PWA yet. M3.2 provides cut/stitch vector SVG export. M2.2 provides physical-size sewing SVG output. The M1.2 Playwright suite uses installed Chromium. Preserve and migrate all existing schema-v4 projects when extending the model.
+**Current limitations to respect:** closed polylines remain drafting paths until explicitly converted to basic `PatternPiece` identities; most marks are standalone annotations; physical printer acceptance and installed/offline PWA remain pending. M3.2 provides cut/stitch vector SVG export, and M3.3 provides actual-size PDF and A4 tiling. M2.2 provides physical-size sewing SVG output. The M1.2 Playwright suite uses installed Chromium. Preserve and migrate all existing schema-v4 projects when extending the model.
 
 ---
 
@@ -159,16 +159,18 @@ Implementation and verification, 2026-11-12: canonical mm SVG export with matchi
 
 ### M3.3 Exact-scale vector PDF and A4 tiling
 
-- [ ] Add and pin `pdf-lib`; build export logic in `src/export/pdf.ts` and `src/export/tiling.ts`. Never rasterize a screenshot or infer physical size from CSS pixels.
-- [ ] Map mm to PDF points using **`72 / 25.4`**, with explicit page orientation and Y-axis transformation. Support **one large sheet** and **tiled A4 (210 × 297 mm)** in portrait/landscape.
-- [ ] Separate physical page size, printable margins (default about 10 mm), tile overlap (default about 10 mm), clipping, and registration crosses. Number sheets in deterministic row-major order.
-- [ ] Include a **100 × 100 mm calibration square** and 100 mm reference ruler (a secondary 50 mm square is fine); include `Print at actual size / 100%` and `Disable Fit to page` instructions.
-- [ ] Maintain uninterrupted cut/stitch paths through tile boundaries with visible alignment marks; never silently shrink pieces to fit a page or draw critical lines only in unprintable margins.
-- [ ] Provide export toggles for stitch, cut, fold, grainline, notches, darts, text, and guides where applicable. Ensure paper positions and annotation sizes use mm-based geometry.
-- [ ] Unit-test PDFs by inspecting vector coordinates/page transforms, not pixel screenshots; compare a 120 mm line, 100 mm square, curved path, and 5 mm allowance across different zoom levels.
-- [ ] Document that printer-driver scaling may still affect actual physical paper; user must measure the test square after printing.
+- [x] Add and pin `pdf-lib`; build export logic in `src/export/pdf.ts` and `src/export/tiling.ts`. Never rasterize a screenshot or infer physical size from CSS pixels.
+- [x] Map mm to PDF points using **`72 / 25.4`**, with explicit page orientation and Y-axis transformation. Support **one large sheet** and **tiled A4 (210 × 297 mm)** in portrait/landscape.
+- [x] Separate physical page size, printable margins (default about 10 mm), tile overlap (default about 10 mm), clipping, and registration crosses. Number sheets in deterministic row-major order.
+- [x] Include a **100 × 100 mm calibration square** and 100 mm reference ruler (a secondary 50 mm square is fine); include `Print at actual size / 100%` and `Disable Fit to page` instructions.
+- [x] Maintain uninterrupted cut/stitch paths through tile boundaries with visible alignment marks; never silently shrink pieces to fit a page or draw critical lines only in unprintable margins.
+- [x] Provide export toggles for stitch, cut, fold, grainline, notches, darts, text, and guides where applicable. Ensure paper positions and annotation sizes use mm-based geometry.
+- [x] Unit-test PDFs by inspecting vector coordinates/page transforms, not pixel screenshots; compare a 120 mm line, 100 mm square, curved path, and 5 mm allowance across different zoom levels.
+- [x] Document that printer-driver scaling may still affect actual physical paper; user must measure the test square after printing.
 
 **M3 gate (critical vertical slice):** create a `180 × 240 mm` wallet panel, apply uniform `5 mm` outward mitered allowance, verify **`190 × 250 mm`** cut bounds, export across A4 tiles at 1:1, and verify the calibration square in the PDF coordinate system. Zoom, theme, display units, and inspector width must not affect the output.
+
+Implementation and verification, 2026-11-12: pinned pdf-lib 1.17.1; canonical vector paths and mm text; explicit downward-world/upward-PDF transforms; one large sheet or portrait/landscape A4 tiles; configurable 10 mm default margins/overlap; clipped repeat paths, world-aligned crosses and row-major labels; calibration/assembly page with exact 100 mm square/ruler and optional 50 mm square. Separate semantic layer controls, visible-guide clipping, disabled-layer bounds, size limits, active-edit guards and cancellation during lazy library loading preserve geometry/history. All 499 unit tests, lint, formatting and build pass. Four installed-Chromium PDF scenarios verify the M3 wallet gate, paper modes/orientation, phone controls, byte-identical output after viewport/theme/unit/inspector changes, invalid labels and asynchronous cancellation. Desktop/390 px dialog screenshots were inspected. Built-in Helvetica rejects unsupported characters with an explicit error and SVG alternative. Physical printing and other-engine/real-device acceptance remain open; both original specifications are unchanged.
 
 ## M4. Safe local projects and offline use [P0/P1]
 
