@@ -90,6 +90,13 @@ export function hasOpenShortcutOverlay() {
     if (element.closest('[hidden], [aria-hidden="true"], [inert]'))
       return false;
     if (typeof window === "undefined") return true;
+    // Closed Mantine selects retain listboxes inside display:none dropdowns.
+    // Their own computed display is still block, but they have no layout boxes.
+    if (
+      typeof element.getClientRects === "function" &&
+      element.getClientRects().length === 0
+    )
+      return false;
     const style = window.getComputedStyle(element);
     return style.display !== "none" && style.visibility !== "hidden";
   });

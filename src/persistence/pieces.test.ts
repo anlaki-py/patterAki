@@ -10,7 +10,8 @@ import {
   transformPieces,
 } from "../document/pieceTransforms";
 import { newAnnotation, putAnnotation } from "../document/annotations";
-it("reopens transformed, split and duplicated pieces with complete metadata and standalone marks", async () => {
+import { attachInternalPath } from "../document/piecePathsEdit";
+it("reopens transformed, split and duplicated pieces with internal paths, metadata and standalone marks", async () => {
   let n = 0;
   const id = () => `saved-${++n}`;
   let doc = addPath(
@@ -39,6 +40,21 @@ it("reopens transformed, split and duplicated pieces with complete metadata and 
     notes: "Preserve every field",
     version: "rev 2",
   };
+  doc = addPath(
+    doc,
+    [
+      { x: 20, y: 20 },
+      { x: 70, y: 40 },
+    ],
+    false,
+    id,
+  );
+  doc = attachInternalPath(
+    doc,
+    "panel",
+    [Object.keys(doc.segments).at(-1)!],
+    "saved-internal",
+  );
   doc = splitLine(doc, doc.pieces.panel.rootSegmentId, 0.3, id);
   doc = transformPieces(doc, ["panel"], rotationAround(33, { x: 50, y: 40 }));
   doc = duplicatePieces(doc, ["panel"], id, { x: 200, y: 0 }).document;

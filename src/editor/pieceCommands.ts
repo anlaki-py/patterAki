@@ -112,12 +112,30 @@ export const pieceCommands = {
     "Attach selected loose path",
     (id) => {
       const s = useEditor.getState();
-      s.commit(attachInternalPath(s.document, id, s.selected, createId()));
+      const next = attachInternalPath(s.document, id, s.selected, createId());
+      s.commit(next);
+      useEditor.setState({
+        selected: pieceEdges(next, next.pieces[id]),
+        activePoint: null,
+        editPieceId: null,
+        selectedGuide: null,
+        tool: "select",
+      });
     },
-    (id) =>
-      idle() &&
-      !!useEditor.getState().document.pieces[id] &&
-      useEditor.getState().selected.length > 0,
+    (id) => {
+      const s = useEditor.getState(),
+        piece = s.document.pieces[id];
+      return (
+        idle() &&
+        !!piece?.visible &&
+        !piece.locked &&
+        s.selected.length > 0 &&
+        s.selected.every(
+          (edgeId) =>
+            !!s.document.segments[edgeId] && !pieceForItem(s.document, edgeId),
+        )
+      );
+    },
   ),
   editPiece: defineCommand(
     "piece.edit",

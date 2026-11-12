@@ -13,40 +13,23 @@ import {
 import { useEditor } from "../editor/store";
 import { commands } from "../editor/commands";
 import { selectedPieceIds } from "../editor/pieceCommands";
-import { pieceBounds } from "../document/pieceTransforms";
 import { pieceForItem } from "../document/pieceAccess";
-import { formatLength, type PatternPiece } from "../document/schema";
+import { type PatternPiece } from "../document/schema";
 import { commandProps, notifyCommand } from "./CommandControls";
 import { PieceActionsMenu } from "./PieceActions";
+import { PieceMeasurements } from "./PieceMeasurements";
 
 function PieceDetails({ piece }: { piece: PatternPiece }) {
   const s = useEditor();
   const [name, setName] = useState(piece.name),
     [metadata, setMetadata] = useState(piece.metadata);
-  const box = pieceBounds(s.preview ?? s.document, [piece.id]);
-  const angle =
-    (Math.atan2(piece.transform.b, piece.transform.a) * 180) / Math.PI;
   return (
     <Stack gap="xs">
       <Text size="sm">
         {s.editPieceId === piece.id ? "Editing geometry" : "Piece selected"} ·{" "}
-        {piece.locked ? "Locked" : "Unlocked"} ·{" "}
-        {piece.visible ? "Visible" : "Hidden"} · Closed clockwise stitching
-        outline
+        Closed clockwise stitching outline
       </Text>
-      <Text size="sm">
-        Width {formatLength(box.max.x - box.min.x, s.document.unitsDisplay)} ·
-        Height {formatLength(box.max.y - box.min.y, s.document.unitsDisplay)}
-        <br />X {formatLength(box.min.x, s.document.unitsDisplay)} · Y{" "}
-        {formatLength(box.min.y, s.document.unitsDisplay)}
-        <br />
-        Rotation {Number(angle.toFixed(2))}° ·{" "}
-        {piece.transform.a * piece.transform.d -
-          piece.transform.b * piece.transform.c <
-        0
-          ? "Mirrored"
-          : "Original orientation"}
-      </Text>
+      <PieceMeasurements document={s.preview ?? s.document} ids={[piece.id]} />
       <TextInput
         label="Piece name"
         value={name}
@@ -127,7 +110,12 @@ export function PieceProperties() {
     : s.selected.length
       ? pieceForItem(s.document, s.selected[0])
       : undefined;
-  const piece = ids.length === 1 ? s.document.pieces[ids[0]] : parent;
+  const piece =
+    ids.length === 1
+      ? s.document.pieces[ids[0]]
+      : ids.length
+        ? undefined
+        : parent;
   const [parentId, setParentId] = useState<string | null>(null);
 
   return (
@@ -136,6 +124,9 @@ export function PieceProperties() {
         Pattern pieces
       </Text>
       <PieceActionsMenu />
+      {ids.length > 1 && (
+        <PieceMeasurements document={s.preview ?? s.document} ids={ids} />
+      )}
       {piece && (
         <PieceDetails key={`${piece.id}-${s.revision}`} piece={piece} />
       )}

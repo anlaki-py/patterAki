@@ -21,4 +21,31 @@ describe("shortcut overlay compatibility", () => {
     vi.stubGlobal("document", { querySelectorAll: () => [hiddenOverlay] });
     expect(hasOpenShortcutOverlay()).toBe(false);
   });
+
+  it.each([false, true])(
+    "only blocks shortcuts for a listbox with a rendered box: visible=%s",
+    (visible) => {
+      const listbox = {
+        closest: () => null,
+        getClientRects: () => (visible ? [{}] : []),
+      };
+      vi.stubGlobal("document", { querySelectorAll: () => [listbox] });
+      vi.stubGlobal("window", {
+        getComputedStyle: () => ({ display: "block", visibility: "visible" }),
+      });
+      expect(hasOpenShortcutOverlay()).toBe(visible);
+    },
+  );
+
+  it("keeps a rendered but invisible overlay from blocking shortcuts", () => {
+    vi.stubGlobal("document", {
+      querySelectorAll: () => [
+        { closest: () => null, getClientRects: () => [{}] },
+      ],
+    });
+    vi.stubGlobal("window", {
+      getComputedStyle: () => ({ display: "block", visibility: "hidden" }),
+    });
+    expect(hasOpenShortcutOverlay()).toBe(false);
+  });
 });
