@@ -19,7 +19,7 @@ import {
   planPdfTiles,
   type PdfLayoutOptions,
 } from "./tiling";
-import { tileFurniture } from "./pdfFurniture";
+import { calibration, tileFurniture } from "./pdfFurniture";
 
 export type PdfExportOptions = PdfLayoutOptions & {
   layers: PdfLayers;
@@ -78,6 +78,10 @@ export async function exportPdf(
     PDFName.of("ViewerPreferences"),
     pdf.context.obj({ PrintScaling: "None" }),
   );
+  if (options.mode === "a4") {
+    const page = pdf.addPage([layout.paperWidth * pt, layout.paperHeight * pt]);
+    calibration(page, font, options.marginMm, options.marginMm + 16);
+  }
   for (const tile of layout.tiles) {
     const page = pdf.addPage([layout.paperWidth * pt, layout.paperHeight * pt]);
     const x = (tile.pageX - tile.left) * pt,

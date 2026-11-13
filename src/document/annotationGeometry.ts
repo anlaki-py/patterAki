@@ -91,8 +91,8 @@ export function annotationShape(mark: Annotation): MarkShape {
           ? 2
           : -mark.fontSizeMm * 0.6;
     if (mark.labelPosition === "inside") {
-      // Reserve one em per character for export fonts as well as the screen font.
-      const gap = 2 * mark.label.length * mark.fontSizeMm - text.width + 4;
+      // Cut only the label layout width, with 2 mm clearance on either side.
+      const gap = text.width + 4;
       const start = (length - gap) / 2,
         end = (length + gap) / 2;
       shape.lines.shift();

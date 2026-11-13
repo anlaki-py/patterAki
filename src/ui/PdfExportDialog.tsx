@@ -183,7 +183,8 @@ export function PdfExportDialog({ onClose }: { onClose: () => void }) {
           scaling can change paper output.
         </Text>
         <Text size="xs">
-          Pages contain pattern content and graphical tile alignment marks only.
+          Tiled PDFs start with a measurement-verification page. Pattern pages
+          contain pattern content and graphical tile alignment marks only.
           Hidden pieces are excluded. Geometry prints at 1:1.
         </Text>
         {!available && (

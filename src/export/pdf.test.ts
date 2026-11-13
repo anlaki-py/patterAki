@@ -86,7 +86,7 @@ describe("actual-size vector PDFs", () => {
     const { pdf, streams } = await inspect(
       await exportPdf(next, ["front"], options),
     );
-    expect(pdf.getPageCount()).toBe(2);
+    expect(pdf.getPageCount()).toBe(3);
     for (const page of pdf.getPages()) {
       expect(page.getWidth()).toBeCloseTo(210 * pt, 10);
       expect(page.getHeight()).toBeCloseTo(297 * pt, 10);
@@ -94,10 +94,16 @@ describe("actual-size vector PDFs", () => {
         page.node.Resources()?.lookup(PDFName.of("XObject"), PDFDict).keys(),
       ).toHaveLength(0);
     }
-    expect(streams.every((stream) => !stream.includes("BT"))).toBe(true);
+    expect(streams[0]).toContain(`${100 * pt} 0 l`);
+    expect(streams[0]).toContain(`${100 * pt} ${100 * pt} l`);
+    expect(streams[0]).toContain(`${50 * pt} ${50 * pt} l`);
+    expect(streams[0]).toContain("BT");
+    expect(streams.slice(1).every((stream) => !stream.includes("BT"))).toBe(
+      true,
+    );
     const prefs = pdf.catalog.lookup(PDFName.of("ViewerPreferences"), PDFDict);
     expect(prefs.get(PDFName.of("PrintScaling"))?.toString()).toBe("/None");
-    for (const stream of streams) {
+    for (const stream of streams.slice(1)) {
       expect(stream).toContain("-5 -5 m\n185 -5 l\n185 245 l\n-5 245 l");
       expect(stream).toContain("180 0 l");
       expect(stream).toContain("W\nn");
@@ -105,11 +111,13 @@ describe("actual-size vector PDFs", () => {
         true,
       );
     }
-    const translations = streams.map((s) =>
-      matrices(s).find(
-        (m) => m[0] === 1 && m[3] === 1 && m[4] !== 0 && m[5] !== 0,
-      )!,
-    );
+    const translations = streams
+      .slice(1)
+      .map((s) =>
+        matrices(s).find(
+          (m) => m[0] === 1 && m[3] === 1 && m[4] !== 0 && m[5] !== 0,
+        )!,
+      );
     expect(translations[0][4] - translations[1][4]).toBeCloseTo(180 * pt, 10);
     expect(translations[0][5]).toBeCloseTo(translations[1][5], 10);
     expect(JSON.stringify(next)).toBe(before);
@@ -136,7 +144,7 @@ describe("actual-size vector PDFs", () => {
     ).toEqual(first);
     const square = fixture(100, 100).doc;
     expect(
-      (await inspect(await exportPdf(square, ["front"], options))).streams[0],
+      (await inspect(await exportPdf(square, ["front"], options))).streams[1],
     ).toContain("100 0 m\n100 100 l");
   });
   it("preserves cubic vector controls after rotation and reflection without a second transform", async () => {
@@ -178,7 +186,7 @@ describe("actual-size vector PDFs", () => {
     const { pdf } = await inspect(
       await exportPdf(doc, ["front"], { ...options, orientation: "landscape" }),
     );
-    expect(pdf.getPageCount()).toBe(2);
+    expect(pdf.getPageCount()).toBe(3);
     expect(pdf.getPage(0).getSize()).toEqual({
       width: 297 * pt,
       height: 210 * pt,

@@ -82,7 +82,7 @@ it("exports a branched frame, inside lines, curves and marks without creating an
     layers: defaultPdfLayers,
     ...target,
   });
-  expect((await PDFDocument.load(bytes)).getPageCount()).toBe(1);
+  expect((await PDFDocument.load(bytes)).getPageCount()).toBe(2);
   expect(doc).toEqual(before);
   expect(doc.pieces).toEqual({});
 });
@@ -175,7 +175,9 @@ it.each([false, true])(
         layers: defaultPdfLayers,
         ...target,
       });
-      expect((await PDFDocument.load(bytes)).getPageCount()).toBe(1);
+      expect((await PDFDocument.load(bytes)).getPageCount()).toBe(
+        mode === "a4" ? 2 : 1,
+      );
     }
   },
 );

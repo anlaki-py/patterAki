@@ -60,6 +60,40 @@ it.each(["top", "bottom", "inside"] as const)(
     ).toContain(`x="${text.position.x}" y="${text.position.y}"`);
   },
 );
+it.each([40, 60, 100])(
+  "keeps the shaft outside the label's occupied space on a %s mm grainline",
+  (lengthMm) => {
+    const mark = {
+      ...grainline(),
+      lengthMm,
+      label: "GRAINLINE",
+      labelPosition: "inside" as const,
+    };
+    const shape = annotationShape(mark),
+      text = shape.texts[0];
+    const shafts = shape.lines.filter(([a, b]) => a.y === 0 && b.y === 0);
+    expect(shafts).toEqual([
+      [
+        { x: 0, y: 0 },
+        { x: text.position.x - 2, y: 0 },
+      ],
+      [
+        { x: text.position.x + text.width + 2, y: 0 },
+        { x: lengthMm, y: 0 },
+      ],
+    ]);
+    expect(shafts.every(([a, b]) => b.x > a.x)).toBe(true);
+    expect(shafts[1][0].x - shafts[0][1].x).toBeCloseTo(text.width + 4);
+    const doc = putAnnotation(emptyDocument("gap"), mark);
+    const drawing = pdfDrawing(doc, [], defaultPdfLayers, true);
+    expect(drawing.paths).toHaveLength(6);
+    expect(drawing.paths).toContainEqual({
+      path: `M 30 40 L ${30 + text.position.x - 2} 40`,
+      role: "grainline",
+      dash: undefined,
+    });
+  },
+);
 it("rotates label bounds and handles empty labels and labels wider than a short shaft", () => {
   const mark = {
     ...grainline(),
@@ -142,6 +176,8 @@ it("retains placement on attachment and exports rotated attached labels with a s
   doc = createPieceFromEdge(doc, Object.keys(doc.segments)[0], "piece");
   doc = putAnnotation(doc, {
     ...grainline(),
+    label: "GRAINLINE",
+    lengthMm: 40,
     labelPosition: "inside",
     rotation: 45,
   });
