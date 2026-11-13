@@ -91,7 +91,7 @@ test("M3.3 wallet gate downloads exact A4 tiles and stays independent of zoom, t
   const first = await download(page);
   expect(first.name).toBe("Wallet.pdf");
   const pdf = await PDFDocument.load(first.bytes);
-  expect(pdf.getPageCount()).toBe(3);
+  expect(pdf.getPageCount()).toBe(2);
   expect(pdf.getPage(0).getSize()).toEqual({
     width: 210 * pt,
     height: 297 * pt,
@@ -153,7 +153,7 @@ test("M3.3 phone paper controls validate margin, overlap and layers without edit
   await seed(page);
   const before = await snapshot(page);
   await open(page);
-  await expect(page.getByText(/Measure the 100 mm test square/)).toBeVisible();
+  await expect(page.getByText(/Pages contain pattern content/)).toBeVisible();
   const margin = page.getByRole("textbox", {
     name: "Print margin (mm)",
     exact: true,

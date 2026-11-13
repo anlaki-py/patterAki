@@ -452,7 +452,7 @@ const version10Schema = z
 const currentSchema = z
   .object({
     ...version10Schema.shape,
-    schemaVersion: z.literal(11),
+    schemaVersion: z.literal(12),
     annotations: z.record(z.string(), annotationSchema),
   })
   .strict()
@@ -466,7 +466,9 @@ const currentSchema = z
         Object.entries(doc.annotations).map(([id, mark]) => [
           id,
           !isFastener(mark)
-            ? mark
+            ? Object.fromEntries(
+                Object.entries(mark).filter(([key]) => key !== "labelPosition"),
+              )
             : {
                 id: mark.id,
                 kind: "drill",
@@ -481,7 +483,7 @@ const currentSchema = z
       for (const issue of topology.error.issues)
         ctx.addIssue({ code: "custom", message: issue.message });
     for (const mark of Object.values(doc.annotations))
-      if (isFastener(mark) && !annotationInRange(mark))
+      if (!annotationInRange(mark))
         ctx.addIssue({
           code: "custom",
           message:
@@ -495,6 +497,28 @@ export const documentSchema = z.preprocess((input) => {
   if (!input || typeof input !== "object" || !("schemaVersion" in input))
     return input;
   let candidate = input as Record<string, unknown>;
+  if (
+    typeof candidate.schemaVersion === "number" &&
+    candidate.schemaVersion < 12
+  ) {
+    // Placement belongs to v12. Reject it in historical records rather than
+    // silently accepting a newer format under an older version number.
+    const annotations = Object.values(
+      (candidate.annotations ?? {}) as Record<string, object>,
+    );
+    const marks = Object.values(
+      (candidate.pieces ?? {}) as Record<
+        string,
+        { sewing?: { marks?: object[] } }
+      >,
+    ).flatMap((p) => p?.sewing?.marks ?? []);
+    if (
+      [...annotations, ...marks].some(
+        (mark) => mark && typeof mark === "object" && "labelPosition" in mark,
+      )
+    )
+      return input;
+  }
   if (candidate.schemaVersion === 1) {
     const legacy = version1Schema.safeParse(candidate);
     if (!legacy.success) return input;
@@ -570,11 +594,16 @@ export const documentSchema = z.preprocess((input) => {
     if (!legacy.success) return input;
     candidate = { ...legacy.data, schemaVersion: 11 };
   }
+  if (candidate.schemaVersion === 11) {
+    const legacy = currentSchema.safeParse({ ...candidate, schemaVersion: 12 });
+    if (!legacy.success) return input;
+    candidate = legacy.data;
+  }
   return candidate;
 }, currentSchema);
 export type PatternDocument = z.infer<typeof documentSchema>;
 export const emptyDocument = (id: string): PatternDocument => ({
-  schemaVersion: 11,
+  schemaVersion: 12,
   annotations: {},
   guides: {},
   pieces: {},

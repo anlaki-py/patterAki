@@ -1,3 +1,5 @@
+import { GrainlineLabelPosition } from "./GrainlineLabelPosition";
+import type { LabelPosition } from "../document/annotationSchema";
 import { commands } from "../editor/commands";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -65,6 +67,9 @@ export function SewingEditor({
     );
   const [attach, setAttach] = useState<string | null>(mark?.segmentId ?? null),
     [error, setError] = useState("");
+  const [labelPosition, setLabelPosition] = useState<LabelPosition>(
+    mark?.labelPosition ?? "top",
+  );
   const [label, setLabel] = useState(mark?.label ?? "");
   const [fontSize, setFontSize] = useState(mark?.fontSizeMm ?? 4);
   const candidate = useMemo(() => {
@@ -119,6 +124,7 @@ export function SewingEditor({
                 rotation: angle,
                 lengthMm: length,
                 label,
+                ...(kind === "grainline" ? { labelPosition } : {}),
                 fontSizeMm: fontSize,
                 ...(attach
                   ? {
@@ -143,6 +149,7 @@ export function SewingEditor({
     base,
     label,
     fontSize,
+    labelPosition,
     mark?.segmentId,
     mark?.fraction,
     pieceId,
@@ -279,6 +286,12 @@ export function SewingEditor({
                   maxLength={120}
                   onChange={(e) => setLabel(e.currentTarget.value)}
                 />
+                {kind === "grainline" && (
+                  <GrainlineLabelPosition
+                    value={labelPosition}
+                    onChange={setLabelPosition}
+                  />
+                )}
                 {field("Mark text size (mm)", fontSize, setFontSize, 1)}
                 <Select
                   clearable

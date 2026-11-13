@@ -37,8 +37,16 @@ export const legacyAnnotationSchema = z.discriminatedUnion("kind", [
     })
     .strict(),
 ]);
+export const labelPositionSchema = z.enum(["top", "bottom", "inside"]);
+export type LabelPosition = z.infer<typeof labelPositionSchema>;
 export const annotationSchema = z.discriminatedUnion("kind", [
-  ...legacyAnnotationSchema.options,
+  legacyAnnotationSchema.options[0],
+  legacyAnnotationSchema.options[1],
+  legacyAnnotationSchema.options[2].safeExtend({
+    labelPosition: labelPositionSchema.optional(),
+  }),
+  legacyAnnotationSchema.options[3],
+  legacyAnnotationSchema.options[4],
   ...fastenerSchemas.map((schema) => schema.safeExtend(base)),
 ]);
 export type Annotation = z.infer<typeof annotationSchema>;

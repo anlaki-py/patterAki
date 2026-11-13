@@ -19,7 +19,7 @@ import {
   planPdfTiles,
   type PdfLayoutOptions,
 } from "./tiling";
-import { calibration, pageText, tileFurniture } from "./pdfFurniture";
+import { tileFurniture } from "./pdfFurniture";
 
 export type PdfExportOptions = PdfLayoutOptions & {
   layers: PdfLayers;
@@ -78,34 +78,6 @@ export async function exportPdf(
     PDFName.of("ViewerPreferences"),
     pdf.context.obj({ PrintScaling: "None" }),
   );
-  if (options.mode === "a4") {
-    const page = pdf.addPage([layout.paperWidth * pt, layout.paperHeight * pt]);
-    pageText(
-      page,
-      font,
-      "PatternAki - calibration and assembly",
-      options.marginMm + 4,
-      options.marginMm + 5,
-      3.5,
-    );
-    calibration(page, font, options.marginMm, options.marginMm + 16);
-    pageText(
-      page,
-      font,
-      `${layout.rows} rows x ${layout.columns} columns, ${layout.tiles.length} tiles. Assemble in row-major order.`,
-      options.marginMm + 4,
-      options.marginMm + 162,
-      2.5,
-    );
-    pageText(
-      page,
-      font,
-      "Overlay shared bands; match crosses before trimming and taping.",
-      options.marginMm + 4,
-      options.marginMm + 168,
-      2.5,
-    );
-  }
   for (const tile of layout.tiles) {
     const page = pdf.addPage([layout.paperWidth * pt, layout.paperHeight * pt]);
     const x = (tile.pageX - tile.left) * pt,
@@ -151,24 +123,7 @@ export async function exportPdf(
       });
     page.pushOperators(popGraphicsState());
     if (options.mode === "a4")
-      tileFurniture(
-        page,
-        font,
-        tile,
-        layout,
-        options.marginMm,
-        options.overlapMm,
-      );
-    else {
-      pageText(
-        page,
-        font,
-        "PatternAki - one large sheet, 1:1",
-        options.marginMm + 4,
-        options.marginMm + 5,
-      );
-      calibration(page, font, options.marginMm, tile.pageY + tile.height + 20);
-    }
+      tileFurniture(page, tile, layout, options.overlapMm);
   }
   return pdf.save({ useObjectStreams: false });
 }

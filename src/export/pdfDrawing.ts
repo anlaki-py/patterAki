@@ -31,7 +31,7 @@ export const defaultPdfLayers = {
   text: true,
   guides: false,
   internal: true,
-  metadata: true,
+  metadata: false,
 };
 export type PdfLayers = typeof defaultPdfLayers;
 type PdfPath = { path: string; role: string; dash?: number[] };
@@ -133,7 +133,7 @@ export function pdfDrawing(
           text: item.text,
           position: { x: item.x!, y: item.y! },
           size: item.fontSize ?? 3,
-          rotation: 0,
+          rotation: item.rotation ?? 0,
         });
     }
     if (layers.text && layers.metadata) {

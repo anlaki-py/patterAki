@@ -4,7 +4,7 @@ import {
   fastenerFields,
   type FastenerFields,
 } from "./fastenerEdit";
-import type { Annotation } from "../document/annotationSchema";
+import type { Annotation, LabelPosition } from "../document/annotationSchema";
 import { putAnnotation } from "../document/annotations";
 import { unitFactor, type PatternDocument } from "../document/schema";
 import { useEditor } from "./store";
@@ -16,6 +16,7 @@ export type AnnotationSession = {
 };
 export type AnnotationFields = {
   fastener?: FastenerFields;
+  labelPosition?: LabelPosition;
   text: string;
   size: number | string;
   length: number | string;
@@ -45,6 +46,9 @@ export function annotationFields(
       unitFactor[units],
     length: ("lengthMm" in mark ? mark.lengthMm : 60) / unitFactor[units],
     rotation: mark.rotation,
+    ...(mark.kind === "grainline"
+      ? { labelPosition: mark.labelPosition ?? "top" }
+      : {}),
   };
 }
 export function previewAnnotation(
@@ -109,6 +113,9 @@ export function previewAnnotation(
   return putAnnotation(session.base, {
     ...base,
     kind: mark.kind,
+    ...(mark.kind === "grainline"
+      ? { labelPosition: fields.labelPosition ?? "top" }
+      : {}),
     lengthMm: fields.length * factor,
     label: fields.text,
     fontSizeMm: fields.size * factor,

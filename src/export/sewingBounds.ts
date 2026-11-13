@@ -1,3 +1,4 @@
+import { transformMarkPoint } from "../geometry/marks";
 import type { PatternDocument, PatternPiece } from "../document/schema";
 import { pieceBounds, applyTransform } from "../document/pieceTransforms";
 import { dartPoints, notchPoint, resolvedMark } from "../document/sewing";
@@ -83,8 +84,15 @@ export function sewingExportBounds(
           item.y !== undefined
         ) {
           const font = item.fontSize ?? 3;
-          include(item.x, item.y - font);
-          include(item.x + item.text.length * font, item.y + font);
+          for (const x of [0, item.text.length * font])
+            for (const y of [-font, font]) {
+              const p = transformMarkPoint(
+                { x, y },
+                { x: item.x, y: item.y },
+                item.rotation ?? 0,
+              );
+              include(p.x, p.y);
+            }
         }
     }
     if (options.metadata) {

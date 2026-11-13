@@ -285,7 +285,7 @@ test("a stored v3 database and v9 document migrate without losing geometry and r
   await ready(page);
   await cache(page);
   const migrated = await backup(page);
-  expect(migrated.schemaVersion).toBe(11);
+  expect(migrated.schemaVersion).toBe(12);
   expect(migrated.points.b.x).toBe(100);
   await page.keyboard.press("Control+s");
   await saved(page);

@@ -1,3 +1,4 @@
+import { labelPositionSchema } from "./annotationSchema";
 import { z } from "zod";
 const id = z.string().min(1);
 const mm = z.number().finite().min(-1e7).max(1e7);
@@ -47,6 +48,7 @@ export const sewingSchema = z
         .object({
           id,
           kind: z.enum(["grainline", "fold"]),
+          labelPosition: labelPositionSchema.optional(),
           label: z.string().max(120).optional(),
           fontSizeMm: z.number().finite().min(1).max(1000).optional(),
           position: point,

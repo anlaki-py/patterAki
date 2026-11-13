@@ -155,7 +155,7 @@ it("migrates schema 10 without modifying old marks and refuses new marks disguis
     schemaVersion: 10,
   };
   const before = structuredClone(old);
-  expect(documentSchema.parse(old)).toEqual({ ...old, schemaVersion: 11 });
+  expect(documentSchema.parse(old)).toEqual({ ...old, schemaVersion: 12 });
   expect(old).toEqual(before);
   expect(
     documentSchema.safeParse({
@@ -163,7 +163,7 @@ it("migrates schema 10 without modifying old marks and refuses new marks disguis
       annotations: { mark: newAnnotation("button", { x: 0, y: 0 }, "mark") },
     }).success,
   ).toBe(false);
-  expect(documentSchema.safeParse({ ...old, schemaVersion: 12 }).success).toBe(
+  expect(documentSchema.safeParse({ ...old, schemaVersion: 99 }).success).toBe(
     false,
   );
 });

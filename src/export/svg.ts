@@ -114,7 +114,7 @@ export function exportSvg(
         for (const item of sewingDrawing(doc, p))
           result += item.path
             ? `<path data-role="${item.role}" d="${item.path}" stroke-dasharray="${roleDash(item.role) ?? "none"}"/>`
-            : `<text x="${item.x}" y="${item.y}" font-size="${item.fontSize ?? 3}">${escape(item.text!)}</text>`;
+            : `<text x="${item.x}" y="${item.y}" transform="rotate(${item.rotation ?? 0} ${item.x} ${item.y})" font-size="${item.fontSize ?? 3}">${escape(item.text!)}</text>`;
         result += "</g>";
       }
       if (options.metadata) {

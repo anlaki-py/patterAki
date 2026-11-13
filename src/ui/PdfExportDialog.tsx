@@ -179,14 +179,12 @@ export function PdfExportDialog({ onClose }: { onClose: () => void }) {
             ))}
         </SimpleGrid>
         <Text size="xs">
-          Print at actual size / 100%. Disable Fit to page. Measure the 100 mm
-          test square before cutting; printer-driver scaling can change paper
-          output.
+          Print at actual size / 100%. Disable Fit to page. Printer-driver
+          scaling can change paper output.
         </Text>
         <Text size="xs">
-          Tiled output includes a calibration and assembly sheet. Drawings need
-          no piece conversion. Hidden pieces are excluded. Geometry prints at
-          1:1.
+          Pages contain pattern content and graphical tile alignment marks only.
+          Hidden pieces are excluded. Geometry prints at 1:1.
         </Text>
         {!available && (
           <Text size="xs">

@@ -23,6 +23,11 @@ export function SvgSewing({ doc }: { doc: PatternDocument }) {
                 x={item.x}
                 y={item.y}
                 fontSize={item.fontSize ?? 3}
+                transform={
+                  item.rotation
+                    ? `rotate(${item.rotation} ${item.x} ${item.y})`
+                    : undefined
+                }
                 fill="var(--draft-line)"
               >
                 {item.text}

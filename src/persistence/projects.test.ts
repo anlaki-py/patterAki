@@ -51,7 +51,7 @@ it("opens a version 1 saved project as version 8 without rewriting the original 
   await database
     .table("projects")
     .put({ id: legacy.id, document: legacy, updatedAt: 1 });
-  expect((await latestProject(database))?.schemaVersion).toBe(11);
+  expect((await latestProject(database))?.schemaVersion).toBe(12);
   expect(
     (await database.table("projects").get("old")).document.schemaVersion,
   ).toBe(1);
@@ -100,7 +100,7 @@ it("migrates saved version 2 curves without rewriting their source record", asyn
     .put({ id: legacy.id, document: legacy, updatedAt: 1 });
   expect(await latestProject(database)).toEqual({
     ...legacy,
-    schemaVersion: 11,
+    schemaVersion: 12,
     annotations: {},
     guides: {},
     pieces: {},

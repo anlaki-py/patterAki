@@ -81,6 +81,33 @@ export function annotationShape(mark: Annotation): MarkShape {
       mark.fontSizeMm,
       -mark.fontSizeMm * 1.2 - 2,
     );
+  if (mark.kind === "grainline" && mark.labelPosition && mark.label) {
+    const text = shape.texts[0];
+    text.position.x = (length - text.width) / 2;
+    text.position.y =
+      mark.labelPosition === "top"
+        ? -mark.fontSizeMm * 1.2 - 2
+        : mark.labelPosition === "bottom"
+          ? 2
+          : -mark.fontSizeMm * 0.6;
+    if (mark.labelPosition === "inside") {
+      // Reserve one em per character for export fonts as well as the screen font.
+      const gap = 2 * mark.label.length * mark.fontSizeMm - text.width + 4;
+      const start = (length - gap) / 2,
+        end = (length + gap) / 2;
+      shape.lines.shift();
+      if (start > 0)
+        shape.lines.push([
+          { x: 0, y: 0 },
+          { x: start, y: 0 },
+        ]);
+      if (end < length)
+        shape.lines.push([
+          { x: end, y: 0 },
+          { x: length, y: 0 },
+        ]);
+    }
+  }
   return shape;
 }
 export const annotationBounds = (mark: Annotation) =>

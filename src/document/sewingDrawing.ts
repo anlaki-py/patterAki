@@ -1,3 +1,5 @@
+import { annotationShape } from "./annotationGeometry";
+import { transformMarkPoint } from "../geometry/marks";
 import { applyTransform } from "./pieceTransforms";
 import { dartPoints, notchPoint, resolvedMark } from "./sewing";
 import type { PatternDocument, PatternPiece } from "./schema";
@@ -9,6 +11,7 @@ export type SewingDrawing = {
   x?: number;
   y?: number;
   fontSize?: number;
+  rotation?: number;
 };
 export function sewingDrawing(
   doc: PatternDocument,
@@ -46,6 +49,39 @@ export function sewingDrawing(
       l = m.lengthMm / 2;
     const at = (x: number, y: number) =>
       `${m.position.x + x * Math.cos(r) - y * Math.sin(r)} ${m.position.y + x * Math.sin(r) + y * Math.cos(r)}`;
+    if (m.kind === "grainline" && m.labelPosition) {
+      const shape = annotationShape({
+        ...m,
+        label: m.label || `${m.kind} ${Number(m.rotation.toFixed(2))}°`,
+        fontSizeMm: m.fontSizeMm ?? 4,
+      });
+      const transform = (x: number, y: number) =>
+        transformMarkPoint({ x: x - l, y }, m.position, m.rotation);
+      result.push({
+        id: m.id,
+        role: m.kind,
+        path: shape.lines
+          .map(([a, b]) => {
+            const start = transform(a.x, a.y),
+              end = transform(b.x, b.y);
+            return `M ${start.x} ${start.y} L ${end.x} ${end.y}`;
+          })
+          .join(" "),
+      });
+      for (const text of shape.texts) {
+        const p = transform(text.position.x, text.position.y + text.size);
+        result.push({
+          id: `${m.id}-label`,
+          role: "dimension",
+          x: p.x,
+          y: p.y,
+          text: text.text,
+          fontSize: text.size,
+          rotation: m.rotation,
+        });
+      }
+      continue;
+    }
     const path =
       m.kind === "grainline"
         ? `M ${at(-l, 0)} L ${at(l, 0)} M ${at(-l + 3, -2)} L ${at(-l, 0)} L ${at(-l + 3, 2)} M ${at(l - 3, -2)} L ${at(l, 0)} L ${at(l - 3, 2)}`

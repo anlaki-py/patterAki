@@ -1,3 +1,4 @@
+import { GrainlineLabelPosition } from "./GrainlineLabelPosition";
 import { isFastener } from "../document/fastenerSchema";
 import { FastenerControls } from "./FastenerControls";
 import { useEffect, useMemo, useState } from "react";
@@ -118,6 +119,14 @@ export function AnnotationDialog({
                     }
                   />
                 )
+              )}
+              {kind === "grainline" && (
+                <GrainlineLabelPosition
+                  value={fields.labelPosition ?? "top"}
+                  onChange={(labelPosition) =>
+                    setFields({ ...fields, labelPosition })
+                  }
+                />
               )}
               <NumberInput
                 label={`${kind === "drill" ? "Mark diameter" : "Text size"} (${units})`}

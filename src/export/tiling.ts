@@ -64,8 +64,8 @@ export function planPdfTiles(
   const left = bounds.min.x - 1,
     top = bounds.min.y - 1;
   if (o.mode === "large") {
-    let paperWidth = Math.max(width + 8, 174) + 2 * o.marginMm;
-    let paperHeight = height + 170 + 2 * o.marginMm;
+    let paperWidth = width + 2 * o.marginMm;
+    let paperHeight = height + 2 * o.marginMm;
     if (o.orientation === "portrait" && paperWidth > paperHeight)
       paperHeight = (paperWidth * 297) / 210;
     else if (o.orientation === "landscape" && paperHeight > paperWidth)
@@ -88,17 +88,16 @@ export function planPdfTiles(
           top,
           width,
           height,
-          pageX: o.marginMm + 4,
-          pageY: o.marginMm + 8,
+          pageX: o.marginMm,
+          pageY: o.marginMm,
         },
       ],
     };
   }
   const [paperWidth, paperHeight] =
     o.orientation === "portrait" ? [210, 297] : [297, 210];
-  // Furniture stays inside the printable margins, separately from the clipped drawing.
-  const tileWidth = paperWidth - 2 * o.marginMm - 8;
-  const tileHeight = paperHeight - 2 * o.marginMm - 24;
+  const tileWidth = paperWidth - 2 * o.marginMm;
+  const tileHeight = paperHeight - 2 * o.marginMm;
   const stepX = tileWidth - o.overlapMm,
     stepY = tileHeight - o.overlapMm;
   const columns = Math.max(1, Math.ceil((width - o.overlapMm - 1e-9) / stepX));
@@ -118,8 +117,8 @@ export function planPdfTiles(
         top: top + row * stepY,
         width: tileWidth,
         height: tileHeight,
-        pageX: o.marginMm + 4,
-        pageY: o.marginMm + 12,
+        pageX: o.marginMm,
+        pageY: o.marginMm,
       });
   return { paperWidth, paperHeight, columns, rows, tiles };
 }

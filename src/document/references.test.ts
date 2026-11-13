@@ -19,9 +19,9 @@ const reference = {
 it("explicitly migrates v9 without changing canonical geometry and rejects unknown schemas", () => {
   const old = { ...emptyDocument("old"), schemaVersion: 9 };
   const migrated = documentSchema.parse(old);
-  expect(migrated).toEqual({ ...old, schemaVersion: 11 });
+  expect(migrated).toEqual({ ...old, schemaVersion: 12 });
   expect(old.schemaVersion).toBe(9);
-  expect(() => documentSchema.parse({ ...old, schemaVersion: 12 })).toThrow();
+  expect(() => documentSchema.parse({ ...old, schemaVersion: 99 })).toThrow();
   expect(() =>
     documentSchema.parse({ ...old, references: { ref: reference } }),
   ).toThrow();

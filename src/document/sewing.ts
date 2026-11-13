@@ -168,6 +168,9 @@ export function attachAnnotation(
       rotation: (Math.atan2(y, x) * 180) / Math.PI,
       lengthMm: mark.lengthMm,
       label: mark.label,
+      ...(mark.kind === "grainline" && mark.labelPosition
+        ? { labelPosition: mark.labelPosition }
+        : {}),
       fontSizeMm: mark.fontSizeMm,
       ...(edgeId ? { segmentId: edgeId } : {}),
     });

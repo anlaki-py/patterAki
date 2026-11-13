@@ -101,7 +101,7 @@ it("v6 saved identity upgrades in memory and leaves the original database row un
       .table("projects")
       .put({ id: legacy.id, document: legacy, updatedAt: 1 });
     const reopened = await latestProject(database);
-    expect(reopened?.schemaVersion).toBe(11);
+    expect(reopened?.schemaVersion).toBe(12);
     expect(reopened?.pieces.piece.stitchingOutline).toHaveLength(4);
     expect(reopened?.points).toEqual(doc.points);
     expect((await database.table("projects").get(legacy.id)).document).toEqual(

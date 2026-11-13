@@ -84,7 +84,7 @@ it.each([5, 6])(
     };
     const before = JSON.stringify(source);
     const doc = parseProject(before);
-    expect(doc.schemaVersion).toBe(11);
+    expect(doc.schemaVersion).toBe(12);
     expect(connectedPath(doc, doc.pieces.panel.stitchingOutline, true)).toBe(
       true,
     );
