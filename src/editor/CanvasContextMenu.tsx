@@ -138,6 +138,7 @@ export function CanvasContextMenu({
           onDivide(target.id, mode);
         },
       }),
+    merge: report(commands.merge.bind()),
     intersections: report(commands.intersections.bind()),
     curve: report(commands.curve.bind()),
     reset: report(commands.reset.bind()),

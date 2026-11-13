@@ -17,6 +17,7 @@ export function EdgeMenuItems({
     intersections: BoundCommand;
     curve: BoundCommand;
     reset: BoundCommand;
+    merge: BoundCommand;
     delete: BoundCommand;
   };
 }) {
@@ -61,6 +62,7 @@ export function EdgeMenuItems({
         command={curved ? actions.reset : actions.curve}
         leftSection={curved ? <Undo2 size={16} /> : <Spline size={16} />}
       />
+      <CommandMenuItem command={actions.merge} />
       <Menu.Divider />
       <CommandMenuItem
         command={actions.delete}

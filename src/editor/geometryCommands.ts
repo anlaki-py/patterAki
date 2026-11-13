@@ -1,3 +1,4 @@
+import { mergeLines } from "../document/mergeLines";
 import { itemEditable } from "../document/pieceAccess";
 import { setPointMode } from "../document/curves";
 import { parseLength } from "../document/lengthInput";
@@ -87,6 +88,31 @@ export const geometryCommands = {
       const s = useEditor.getState();
       return (
         !!s.activePoint && itemEditable(s.document, s.activePoint) && !s.preview
+      );
+    },
+  ),
+  merge: defineCommand(
+    "edge.merge-lines",
+    "Merge lines and remove points",
+    () => {
+      const s = useEditor.getState();
+      const next = mergeLines(s.document, s.selected);
+      s.commit(next);
+      s.cancel();
+      useEditor.setState({ selected: [s.selected[0]] });
+    },
+    () => {
+      const s = useEditor.getState();
+      return (
+        !s.preview &&
+        !s.hasDraft &&
+        !s.gestureActive &&
+        s.selected.length >= 2 &&
+        s.selected.every(
+          (id) =>
+            s.document.segments[id]?.kind === "line" &&
+            itemEditable(s.document, id),
+        )
       );
     },
   ),
