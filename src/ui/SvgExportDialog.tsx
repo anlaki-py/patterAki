@@ -1,8 +1,13 @@
+import {
+  drawingScope,
+  resolveExportScope,
+  type ExportScope,
+} from "../export/drawingScope";
+import { ExportScopeSelect } from "./ExportScopeSelect";
 import { reviewSvg } from "../export/referenceReview";
 import { useEffect, useRef, useState } from "react";
-import { Button, Checkbox, Group, Select, Stack, Text } from "@mantine/core";
+import { Button, Checkbox, Group, Stack, Text } from "@mantine/core";
 import { useEditor } from "../editor/store";
-import { pieceForItem } from "../document/pieceAccess";
 import { exportSvg, type SvgExportOptions } from "../export/svg";
 import { downloadSvg } from "../export/download";
 import { DraggableModal } from "./DraggableModal";
@@ -20,17 +25,9 @@ export function SvgExportDialog({ onClose }: { onClose: () => void }) {
     onClose();
   };
   const s = useEditor();
-  const selected = [
-    ...new Set(
-      s.selected.flatMap((id) => {
-        const piece = s.document.pieces[id] ?? pieceForItem(s.document, id);
-        return piece?.visible ? [piece.id] : [];
-      }),
-    ),
-  ];
-  const [scope, setScope] = useState<string>(
-    selected.length ? "selected" : "all",
-  );
+  const availableScopes = drawingScope(s.document, s.selected);
+  const [scope, setScope] = useState<ExportScope>(availableScopes.initial);
+  const [drawingLines, setDrawingLines] = useState(true);
   const [options, setOptions] = useState<Omit<SvgExportOptions, "annotations">>(
     {
       cut: true,
@@ -43,31 +40,43 @@ export function SvgExportDialog({ onClose }: { onClose: () => void }) {
   const [underlay, setUnderlay] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const pieces = Object.values(s.document.pieces).filter((p) => p.visible);
-  const ids = scope === "all" ? pieces.map((p) => p.id) : selected;
+  const target = resolveExportScope(
+    s.document,
+    s.selected,
+    scope,
+    drawingLines,
+  );
+  const ids = target.pieceIds;
   const available = s.ready && !s.preview && !s.hasDraft && !s.gestureActive;
   const hasLayer =
-    options.cut ||
-    options.stitch ||
-    options.marks ||
-    options.internal ||
-    options.metadata;
+    (ids.length > 0 &&
+      (options.cut ||
+        options.stitch ||
+        options.marks ||
+        options.internal ||
+        options.metadata)) ||
+    !!target.drawing?.segmentIds.length ||
+    (options.marks &&
+      (!!target.drawing?.annotationIds.length ||
+        (target.annotations &&
+          Object.keys(s.document.annotations).length > 0)));
   return (
     <DraggableModal title="Export vector SVG" onClose={close}>
       <Stack gap="sm">
-        <Select
+        <ExportScopeSelect
           label="Export scope"
           value={scope}
-          onChange={(value) => value && setScope(value)}
-          data={[
-            { value: "all", label: "All visible pieces" },
-            {
-              value: "selected",
-              label: `Selected pieces (${selected.length})`,
-              disabled: !selected.length,
-            },
-          ]}
+          onChange={setScope}
+          selectedPieces={availableScopes.selectedPieces.length}
+          selectedItems={availableScopes.selectedItems.length}
         />
+        {(scope === "drawing" || scope === "selection") && (
+          <Checkbox
+            label="Drawing lines and curves"
+            checked={drawingLines}
+            onChange={(event) => setDrawingLines(event.currentTarget.checked)}
+          />
+        )}
         {(
           [
             ["cut", "Cut outlines"],
@@ -76,17 +85,19 @@ export function SvgExportDialog({ onClose }: { onClose: () => void }) {
             ["internal", "Internal construction paths"],
             ["metadata", "Piece metadata"],
           ] as const
-        ).map(([key, label]) => (
-          <Checkbox
-            key={key}
-            label={label}
-            checked={options[key]}
-            onChange={(event) => {
-              const checked = event.currentTarget.checked;
-              setOptions((current) => ({ ...current, [key]: checked }));
-            }}
-          />
-        ))}
+        )
+          .filter(([key]) => ids.length > 0 || key === "marks")
+          .map(([key, label]) => (
+            <Checkbox
+              key={key}
+              label={label}
+              checked={options[key]}
+              onChange={(event) => {
+                const checked = event.currentTarget.checked;
+                setOptions((current) => ({ ...current, [key]: checked }));
+              }}
+            />
+          ))}
         <Checkbox
           label="Reference underlay for review only"
           checked={underlay}
@@ -100,10 +111,9 @@ export function SvgExportDialog({ onClose }: { onClose: () => void }) {
           </Text>
         )}
         <Text size="xs">
-          Physical dimensions use mm at 1:1 scale with a 10 mm margin. Hidden
-          pieces are excluded. Internal paths follow their Export setting.
-          All-piece exports include free annotations when marks are enabled;
-          selected exports include attached marks only.
+          Physical dimensions print at 1:1 with a 10 mm margin. Drawings need no
+          piece conversion. Hidden pieces are excluded; piece paths follow their
+          Export setting.
         </Text>
         {!available && (
           <Text size="sm">
@@ -121,13 +131,14 @@ export function SvgExportDialog({ onClose }: { onClose: () => void }) {
           </Button>
           <Button
             loading={busy}
-            disabled={!available || !ids.length || !hasLayer || busy}
+            disabled={!available || !hasLayer || busy}
             onClick={async () => {
               setBusy(true);
               try {
                 const svg = exportSvg(s.document, ids, {
                   ...options,
-                  annotations: scope === "all",
+                  annotations: target.annotations,
+                  drawing: target.drawing,
                 });
                 const output = underlay
                   ? await reviewSvg(svg, s.document)
@@ -135,7 +146,7 @@ export function SvgExportDialog({ onClose }: { onClose: () => void }) {
                 if (cancelled.current) return;
                 downloadSvg(
                   output,
-                  ids.length === 1
+                  ids.length === 1 && scope !== "drawing"
                     ? s.document.pieces[ids[0]].name
                     : s.document.name,
                 );

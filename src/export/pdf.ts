@@ -1,3 +1,4 @@
+import type { DrawingItems } from "./drawingScope";
 import {
   PDFDocument,
   StandardFonts,
@@ -23,6 +24,7 @@ import { calibration, pageText, tileFurniture } from "./pdfFurniture";
 export type PdfExportOptions = PdfLayoutOptions & {
   layers: PdfLayers;
   annotations: boolean;
+  drawing?: DrawingItems;
 };
 export async function exportPdf(
   doc: PatternDocument,
@@ -34,6 +36,7 @@ export async function exportPdf(
     pieceIds,
     options.layers,
     options.annotations,
+    options.drawing,
   );
   const pdf = await PDFDocument.create();
   const font = await pdf.embedFont(StandardFonts.Helvetica);

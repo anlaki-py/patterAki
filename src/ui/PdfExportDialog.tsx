@@ -1,3 +1,9 @@
+import {
+  drawingScope,
+  resolveExportScope,
+  type ExportScope,
+} from "../export/drawingScope";
+import { ExportScopeSelect } from "./ExportScopeSelect";
 import { useEffect, useRef, useState } from "react";
 import {
   Button,
@@ -10,7 +16,6 @@ import {
   Text,
 } from "@mantine/core";
 import { useEditor } from "../editor/store";
-import { pieceForItem } from "../document/pieceAccess";
 import { defaultPdfLayers } from "../export/pdfDrawing";
 import {
   defaultPdfLayout,
@@ -22,15 +27,9 @@ import { DraggableModal } from "./DraggableModal";
 
 export function PdfExportDialog({ onClose }: { onClose: () => void }) {
   const s = useEditor();
-  const selected = [
-    ...new Set(
-      s.selected.flatMap((id) => {
-        const p = s.document.pieces[id] ?? pieceForItem(s.document, id);
-        return p?.visible ? [p.id] : [];
-      }),
-    ),
-  ];
-  const [scope, setScope] = useState(selected.length ? "selected" : "all");
+  const availableScopes = drawingScope(s.document, s.selected);
+  const [scope, setScope] = useState<ExportScope>(availableScopes.initial);
+  const [drawingLines, setDrawingLines] = useState(true);
   const [layout, setLayout] = useState<
     Pick<PdfLayoutOptions, "mode" | "orientation">
   >({
@@ -57,12 +56,13 @@ export function PdfExportDialog({ onClose }: { onClose: () => void }) {
     active.current = false;
     onClose();
   };
-  const ids =
-    scope === "all"
-      ? Object.values(s.document.pieces)
-          .filter((p) => p.visible)
-          .map((p) => p.id)
-      : selected;
+  const target = resolveExportScope(
+    s.document,
+    s.selected,
+    scope,
+    drawingLines,
+  );
+  const ids = target.pieceIds;
   const parsed = pdfLayoutSchema.safeParse({
     ...layout,
     marginMm: margin,
@@ -72,20 +72,22 @@ export function PdfExportDialog({ onClose }: { onClose: () => void }) {
   return (
     <DraggableModal title="Export actual-size PDF" onClose={close}>
       <Stack gap="xs">
-        <Select
+        <ExportScopeSelect
           label="PDF scope"
           value={scope}
-          onChange={(value) => value && setScope(value)}
+          onChange={setScope}
           disabled={busy}
-          data={[
-            { value: "all", label: "All visible pieces" },
-            {
-              value: "selected",
-              label: `Selected pieces (${selected.length})`,
-              disabled: !selected.length,
-            },
-          ]}
+          selectedPieces={availableScopes.selectedPieces.length}
+          selectedItems={availableScopes.selectedItems.length}
         />
+        {(scope === "drawing" || scope === "selection") && (
+          <Checkbox
+            label="Drawing lines and curves"
+            checked={drawingLines}
+            disabled={busy}
+            onChange={(event) => setDrawingLines(event.currentTarget.checked)}
+          />
+        )}
         <Select
           label="Paper layout"
           value={layout.mode}
@@ -154,18 +156,27 @@ export function PdfExportDialog({ onClose }: { onClose: () => void }) {
               ["internal", "Internal paths"],
               ["metadata", "Piece metadata"],
             ] as const
-          ).map(([key, label]) => (
-            <Checkbox
-              key={key}
-              label={label}
-              checked={layers[key]}
-              disabled={busy}
-              onChange={(event) => {
-                const checked = event.currentTarget.checked;
-                setLayers((current) => ({ ...current, [key]: checked }));
-              }}
-            />
-          ))}
+          )
+            .filter(
+              ([key]) =>
+                ids.length > 0 ||
+                key === "fold" ||
+                key === "grainline" ||
+                key === "text" ||
+                key === "guides",
+            )
+            .map(([key, label]) => (
+              <Checkbox
+                key={key}
+                label={label}
+                checked={layers[key]}
+                disabled={busy}
+                onChange={(event) => {
+                  const checked = event.currentTarget.checked;
+                  setLayers((current) => ({ ...current, [key]: checked }));
+                }}
+              />
+            ))}
         </SimpleGrid>
         <Text size="xs">
           Print at actual size / 100%. Disable Fit to page. Measure the 100 mm
@@ -173,9 +184,8 @@ export function PdfExportDialog({ onClose }: { onClose: () => void }) {
           output.
         </Text>
         <Text size="xs">
-          Tiled output starts with a calibration and assembly sheet. Hidden
-          pieces are excluded. All-piece exports include free annotations;
-          selected exports include attached marks. Geometry always prints at
+          Tiled output includes a calibration and assembly sheet. Drawings need
+          no piece conversion. Hidden pieces are excluded. Geometry prints at
           1:1.
         </Text>
         {!available && (
@@ -196,9 +206,10 @@ export function PdfExportDialog({ onClose }: { onClose: () => void }) {
             loading={busy}
             disabled={
               !available ||
-              !ids.length ||
+              !target.hasContent ||
               !parsed.success ||
-              !Object.values(layers).some(Boolean)
+              (!Object.values(layers).some(Boolean) &&
+                !target.drawing?.segmentIds.length)
             }
             onClick={async () => {
               if (!parsed.success || busy) return;
@@ -210,12 +221,13 @@ export function PdfExportDialog({ onClose }: { onClose: () => void }) {
                 const bytes = await exportPdf(s.document, ids, {
                   ...parsed.data,
                   layers,
-                  annotations: scope === "all",
+                  annotations: target.annotations,
+                  drawing: target.drawing,
                 });
                 if (!active.current) return;
                 downloadPdf(
                   bytes,
-                  ids.length === 1
+                  ids.length === 1 && scope !== "drawing"
                     ? s.document.pieces[ids[0]].name
                     : s.document.name,
                 );

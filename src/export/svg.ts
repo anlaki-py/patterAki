@@ -1,3 +1,10 @@
+import {
+  drawingSegments,
+  drawingAnnotations,
+  emptyExportBounds,
+  includeExportBounds,
+  type DrawingItems,
+} from "./drawingScope";
 import { sewingExportBounds, metadataLines } from "./sewingBounds";
 import type { PatternDocument } from "../document/schema";
 import { segmentPath } from "../document/segments";
@@ -15,8 +22,9 @@ export type SewingExportOptions = {
 export type SvgExportOptions = SewingExportOptions & {
   cut: boolean;
   stitch: boolean;
-  /** Free document annotations have no piece owner. Include only for all-piece exports. */
+  /** Include all free marks; drawing scopes can also specify individual mark IDs. */
   annotations: boolean;
+  drawing?: DrawingItems;
 };
 export function exportSvg(
   doc: PatternDocument,
@@ -27,17 +35,20 @@ export function exportSvg(
     throw new Error("Cannot export an invalid pattern document.");
   if (pieceIds.some((id) => !doc.pieces[id]))
     throw new Error("An export piece no longer exists.");
+  const loose = drawingSegments(doc, options.drawing);
   if (!(
     options.cut ||
     options.stitch ||
     options.internal ||
     options.marks ||
-    options.metadata
+    options.metadata ||
+    loose.length
   ))
     throw new Error("Choose at least one export layer.");
   const ids = [...new Set(pieceIds)].filter((id) => doc.pieces[id].visible);
-  if (!ids.length) throw new Error("Choose at least one visible piece.");
-  const bounds = sewingExportBounds(doc, ids, options),
+  const bounds = ids.length
+      ? sewingExportBounds(doc, ids, options)
+      : emptyExportBounds(),
     margin = 10;
   const cuts = new Map<string, ReturnType<typeof cutOutline>>();
   if (options.cut)
@@ -58,16 +69,15 @@ export function exportSvg(
         );
       }
     }
-  const annotations =
-    options.marks && options.annotations
-      ? Object.values(doc.annotations).map(exportAnnotation)
-      : [];
-  for (const item of annotations) {
-    bounds.min.x = Math.min(bounds.min.x, item.bounds.min.x);
-    bounds.min.y = Math.min(bounds.min.y, item.bounds.min.y);
-    bounds.max.x = Math.max(bounds.max.x, item.bounds.max.x);
-    bounds.max.y = Math.max(bounds.max.y, item.bounds.max.y);
-  }
+  const annotations = options.marks
+    ? drawingAnnotations(doc, options.annotations, options.drawing).map(
+        exportAnnotation,
+      )
+    : [];
+  if (!ids.length && !loose.length && !annotations.length)
+    throw new Error("The selected export layers contain no drawing geometry.");
+  for (const item of loose) includeExportBounds(bounds, item.bounds);
+  for (const item of annotations) includeExportBounds(bounds, item.bounds);
   const x = bounds.min.x - margin,
     y = bounds.min.y - margin,
     width = bounds.max.x - bounds.min.x + 2 * margin,
@@ -119,7 +129,10 @@ export function exportSvg(
       return result + "</g>";
     })
     .join("");
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}mm" height="${height}mm" viewBox="${x} ${y} ${width} ${height}"><g fill="none" stroke="black" stroke-width="0.35">${body}${annotations.length ? `<g data-layer="annotations">${annotations.map((item) => item.svg).join("")}</g>` : ""}</g><style>text{fill:black;stroke:none;font-family:sans-serif}</style></svg>`;
+  const drawing = loose.length
+    ? `<g data-layer="drawing">${loose.map(({ edge }) => `<path data-segment="${escape(edge.id)}" d="${segmentPath(doc, edge)}"/>`).join("")}</g>`
+    : "";
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}mm" height="${height}mm" viewBox="${x} ${y} ${width} ${height}"><g fill="none" stroke="black" stroke-width="0.35">${body}${drawing}${annotations.length ? `<g data-layer="annotations">${annotations.map((item) => item.svg).join("")}</g>` : ""}</g><style>text{fill:black;stroke:none;font-family:sans-serif}</style></svg>`;
 }
 
 /** Existing per-piece sewing drawing uses the same canonical vector exporter. */

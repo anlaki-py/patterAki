@@ -156,7 +156,9 @@ export function SvgGeometry({
               strokeDasharray={roleDash(role)}
               className="edge-stroke"
               visibility={
-                parent && !path && mode === "cut" ? "hidden" : undefined
+                parent && !path && mode === "cut" && parent.id !== editPieceId
+                  ? "hidden"
+                  : undefined
               }
               vectorEffect="non-scaling-stroke"
             />
@@ -184,7 +186,17 @@ export function SvgGeometry({
                 selectedPointSet.has(id) ? "point point-active" : "point"
               }
               pointerEvents="none"
-              visibility={parent && mode === "cut" ? "hidden" : undefined}
+              visibility={
+                parent &&
+                parent.id !== editPieceId &&
+                mode === "cut" &&
+                parent.stitchingOutline.some((ref) => {
+                  const edge = doc.segments[ref.segmentId];
+                  return edge.from === id || edge.to === id;
+                })
+                  ? "hidden"
+                  : undefined
+              }
             />
             {pointHandlesEnabled &&
               itemEditable(doc, id) &&

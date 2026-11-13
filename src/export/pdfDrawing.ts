@@ -1,3 +1,10 @@
+import {
+  drawingSegments,
+  drawingAnnotations,
+  emptyExportBounds,
+  includeExportBounds,
+  type DrawingItems,
+} from "./drawingScope";
 import { markCurvePath } from "../geometry/markCurves";
 import type { Cubic } from "../geometry/bezier";
 import { documentSchema, type PatternDocument } from "../document/schema";
@@ -39,14 +46,15 @@ export function pdfDrawing(
   pieceIds: string[],
   layers: PdfLayers,
   annotations: boolean,
+  drawing?: DrawingItems,
 ) {
   if (!documentSchema.safeParse(doc).success)
     throw new Error("Cannot export an invalid pattern document.");
   if (pieceIds.some((id) => !doc.pieces[id]))
     throw new Error("An export piece no longer exists.");
   const ids = [...new Set(pieceIds)].filter((id) => doc.pieces[id].visible);
-  if (!ids.length) throw new Error("Choose at least one visible piece.");
-  if (!Object.values(layers).some(Boolean))
+  const loose = drawingSegments(doc, drawing);
+  if (!Object.values(layers).some(Boolean) && !loose.length)
     throw new Error("Choose at least one PDF layer.");
   const allowed = (role: string) =>
     role === "fold"
@@ -58,14 +66,17 @@ export function pdfDrawing(
           : role === "dart"
             ? layers.darts
             : true;
-  const bounds = sewingExportBounds(doc, ids, {
-    internal: layers.internal,
-    text: layers.text,
-    roleVisible: (role) =>
-      allowed(role) && (role !== "stitch" || layers.stitch),
-    marks: layers.fold || layers.grainline || layers.notches || layers.darts,
-    metadata: layers.text && layers.metadata,
-  });
+  const bounds = ids.length
+    ? sewingExportBounds(doc, ids, {
+        internal: layers.internal,
+        text: layers.text,
+        roleVisible: (role) =>
+          allowed(role) && (role !== "stitch" || layers.stitch),
+        marks:
+          layers.fold || layers.grainline || layers.notches || layers.darts,
+        metadata: layers.text && layers.metadata,
+      })
+    : emptyExportBounds();
   const paths: PdfPath[] = [],
     texts: PdfText[] = [],
     circles: { center: Vec2; radius: number }[] = [];
@@ -137,45 +148,52 @@ export function pdfDrawing(
       );
     }
   }
-  if (annotations)
-    for (const mark of Object.values(doc.annotations)) {
-      if (!allowed(mark.kind) || (mark.kind === "text" && !layers.text))
-        continue;
-      const shape = annotationShape(mark);
-      const transform = (p: Vec2) =>
-        transformMarkPoint(p, mark.position, mark.rotation);
-      for (const [a, b] of shape.lines) {
-        const start = transform(a),
-          end = transform(b);
-        path(`M ${start.x} ${start.y} L ${end.x} ${end.y}`, mark.kind);
-      }
-      for (const curve of shape.curves ?? [])
-        path(markCurvePath(curve.map(transform) as Cubic), mark.kind);
-      for (const c of shape.circles)
-        circles.push({ center: transform(c.center), radius: c.radius });
-      if (layers.text)
-        for (const t of shape.texts)
-          texts.push({
-            text: t.text,
-            position: transform({ x: t.position.x, y: t.position.y + t.size }),
-            size: t.size,
-            rotation: mark.rotation,
-          });
-      const b = markBounds(
-        {
-          ...shape,
-          texts: layers.text
-            ? shape.texts.map((t) => ({ ...t, width: t.text.length * t.size }))
-            : [],
-        },
-        mark.position,
-        mark.rotation,
-      );
-      include(b.min);
-      include(b.max);
+  for (const { edge, bounds: extra } of loose) {
+    path(segmentPath(doc, edge), "drawing");
+    includeExportBounds(bounds, extra);
+  }
+  for (const mark of drawingAnnotations(doc, annotations, drawing)) {
+    if (!allowed(mark.kind) || (mark.kind === "text" && !layers.text)) continue;
+    const shape = annotationShape(mark);
+    const transform = (p: Vec2) =>
+      transformMarkPoint(p, mark.position, mark.rotation);
+    for (const [a, b] of shape.lines) {
+      const start = transform(a),
+        end = transform(b);
+      path(`M ${start.x} ${start.y} L ${end.x} ${end.y}`, mark.kind);
     }
+    for (const curve of shape.curves ?? [])
+      path(markCurvePath(curve.map(transform) as Cubic), mark.kind);
+    for (const c of shape.circles)
+      circles.push({ center: transform(c.center), radius: c.radius });
+    if (layers.text)
+      for (const t of shape.texts)
+        texts.push({
+          text: t.text,
+          position: transform({ x: t.position.x, y: t.position.y + t.size }),
+          size: t.size,
+          rotation: mark.rotation,
+        });
+    const b = markBounds(
+      {
+        ...shape,
+        texts: layers.text
+          ? shape.texts.map((t) => ({ ...t, width: t.text.length * t.size }))
+          : [],
+      },
+      mark.position,
+      mark.rotation,
+    );
+    include(b.min);
+    include(b.max);
+  }
   // Infinite workspace guides stop at the drawing bounds and never change paper extent.
-  if (layers.guides)
+  if (
+    layers.guides &&
+    [bounds.min.x, bounds.min.y, bounds.max.x, bounds.max.y].every(
+      Number.isFinite,
+    )
+  )
     for (const guide of Object.values(doc.guides)) {
       if (!guide.visible) continue;
       const d =

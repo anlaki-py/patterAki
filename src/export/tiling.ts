@@ -54,10 +54,13 @@ export function planPdfTiles(
       width,
       height,
     ].every(Number.isFinite) ||
-    width <= 2 ||
-    height <= 2
+    width < 2 ||
+    height < 2 ||
+    (width === 2 && height === 2)
   )
-    throw new Error("The PDF drawing must have finite, positive dimensions.");
+    throw new Error(
+      "The PDF drawing must contain geometry with finite dimensions.",
+    );
   const left = bounds.min.x - 1,
     top = bounds.min.y - 1;
   if (o.mode === "large") {
@@ -69,7 +72,7 @@ export function planPdfTiles(
       paperWidth = (paperHeight * 297) / 210;
     if (Math.max(paperWidth, paperHeight) > 5000)
       throw new Error(
-        "Large sheets are limited to 5000 mm. Choose tiled A4 or export fewer pieces.",
+        "Large sheets are limited to 5000 mm. Choose tiled A4 or export a smaller drawing.",
       );
     return {
       paperWidth,
@@ -102,7 +105,7 @@ export function planPdfTiles(
   const rows = Math.max(1, Math.ceil((height - o.overlapMm - 1e-9) / stepY));
   if (columns * rows > 200)
     throw new Error(
-      "This export needs more than 200 tiles. Export fewer pieces or use a large sheet.",
+      "This export needs more than 200 tiles. Export a smaller drawing or use a large sheet.",
     );
   const tiles: PdfTile[] = [];
   for (let row = 0; row < rows; row++)

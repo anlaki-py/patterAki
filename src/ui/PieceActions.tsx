@@ -54,8 +54,9 @@ export function usePieceActions(closeMenu: () => void) {
       </Menu.Label>
       {!ids.length && edgeId && (
         <Menu.Label style={{ whiteSpace: "normal", textTransform: "none" }}>
-          Piece actions require a pattern piece. Convert a closed path below, or
-          select an existing piece.
+          Pieces are optional for drawing exports. Conversion needs a closed
+          outline with no attached branches; open or branched drawings can be
+          exported directly.
         </Menu.Label>
       )}
       {!ids.length && <CommandMenuItem command={create} />}
@@ -171,7 +172,7 @@ export function usePieceActions(closeMenu: () => void) {
       : ids.length
         ? `${ids.length} pattern ${ids.length === 1 ? "piece" : "pieces"} selected`
         : edgeId
-          ? "Draft path selected. Use Piece actions to create a pattern piece."
+          ? "Drawing selected. Export SVG or PDF directly; pieces are optional."
           : "Select a closed path or pattern piece.",
     dialogs: (
       <>

@@ -339,7 +339,7 @@ describe("actual-size vector PDFs", () => {
     await expect(exportPdf(doc, ["missing"], options)).rejects.toThrow(
       /no longer exists/,
     );
-    await expect(exportPdf(doc, [], options)).rejects.toThrow(/visible piece/);
+    await expect(exportPdf(doc, [], options)).rejects.toThrow(/geometry/);
     const none = Object.fromEntries(
       Object.keys(options.layers).map((key) => [key, false]),
     ) as typeof options.layers;

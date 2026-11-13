@@ -249,7 +249,7 @@ describe("canonical vector SVG", () => {
   it("rejects missing/hidden selections, disabled layers and malformed schemas", () => {
     const { doc } = fixture();
     const before = JSON.stringify(doc);
-    expect(() => exportSvg(doc, [], stitch)).toThrow(/visible piece/);
+    expect(() => exportSvg(doc, [], stitch)).toThrow(/geometry/);
     expect(() => exportSvg(doc, ["missing"], stitch)).toThrow(
       /no longer exists/,
     );
@@ -269,7 +269,7 @@ describe("canonical vector SVG", () => {
     ).toThrow(/invalid pattern/);
     expect(JSON.stringify(doc)).toBe(before);
     doc.pieces.front.visible = false;
-    expect(() => exportSvg(doc, ["front"], stitch)).toThrow(/visible piece/);
+    expect(() => exportSvg(doc, ["front"], stitch)).toThrow(/geometry/);
   });
   it("reports impossible cut offsets without mutating geometry and still permits stitch export", () => {
     const { doc } = fixture([
