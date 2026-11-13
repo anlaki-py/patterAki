@@ -9,7 +9,6 @@ type InstallEvent = Event & {
 };
 export function PwaStatus() {
   const [waiting, setWaiting] = useState(false);
-  const [offlineReady, setOfflineReady] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [install, setInstall] = useState<InstallEvent | null>(null);
@@ -50,7 +49,6 @@ export function PwaStatus() {
             if (!live) return;
             if (reg.waiting && navigator.serviceWorker.controller)
               setWaiting(true);
-            if (reg.active) setOfflineReady(true);
           };
           inspect();
           reg.addEventListener("updatefound", () => {
@@ -89,14 +87,14 @@ export function PwaStatus() {
   }, []);
   return (
     <>
-      {(waiting || error || offlineReady || install) && (
+      {(waiting || error || install) && (
         <Alert
           title={
             waiting
               ? "App update available"
               : error
                 ? "Offline cache warning"
-                : "Offline app"
+                : "Install PatternAki"
           }
           color={error ? "orange" : "blue"}
           style={{ flexShrink: 0 }}
@@ -106,9 +104,7 @@ export function PwaStatus() {
               {error ||
                 (waiting
                   ? "Save committed work and reload when ready. Finish all active edits first. Other tabs will stay open."
-                  : offlineReady
-                    ? "App cached for offline use. Keep JSON backups outside browser storage."
-                    : "Install PatternAki for offline drafting after the app cache is ready.")}
+                  : "Install PatternAki for offline drafting after the app cache is ready.")}
             </Text>
             {waiting && (
               <Button
@@ -183,7 +179,6 @@ export function PwaStatus() {
                 variant="subtle"
                 size="xs"
                 onClick={() => {
-                  setOfflineReady(false);
                   setError("");
                   setInstall(null);
                 }}

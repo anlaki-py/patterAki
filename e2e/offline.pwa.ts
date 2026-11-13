@@ -21,6 +21,8 @@ async function cache(page: Page) {
   await expect
     .poll(() => page.evaluate(() => !!navigator.serviceWorker.controller))
     .toBe(true);
+  await expect(page.getByText("Offline app", { exact: true })).toHaveCount(0);
+  await expect(page.getByText(/App cached for offline use/)).toHaveCount(0);
 }
 async function draw(page: Page, offset = 0) {
   await page.getByRole("button", { name: "Line", exact: true }).click();
@@ -73,6 +75,7 @@ test("production PWA manifest, cold offline startup, editing, project reopening 
   await draw(page);
   const original = await backup(page);
   expect(original.assets).toHaveLength(1);
+  await expect(page.getByText(/App cached for offline use/)).toHaveCount(0);
   await context.setOffline(true);
   const cold = await context.newPage();
   await page.close();
@@ -80,6 +83,7 @@ test("production PWA manifest, cold offline startup, editing, project reopening 
   await ready(cold);
   await expect(cold.locator("[data-layer=references] image")).toHaveCount(1);
   expect(await backup(cold)).toEqual(original);
+  await expect(cold.getByText(/App cached for offline use/)).toHaveCount(0);
   await draw(cold, 100);
   const edited = await backup(cold);
   expect(Object.keys(edited.document.segments)).toHaveLength(2);
@@ -93,6 +97,7 @@ test("production PWA manifest, cold offline startup, editing, project reopening 
   expect(reopened.document.segments).toEqual(edited.document.segments);
   await cold.reload();
   await ready(cold);
+  await expect(cold.getByText(/App cached for offline use/)).toHaveCount(0);
   expect(await backup(cold)).toEqual(edited);
   await cold.screenshot({ path: "test-results/offline-production.png" });
 });

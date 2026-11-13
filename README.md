@@ -260,6 +260,8 @@ Verification on 2026-11-12: all 508 unit tests pass. Eleven installed-Chromium s
 
 Production builds follow the [Vite PWA injectManifest workflow](https://vite-pwa-org.netlify.app/guide/inject-manifest) and include a manifest, SVG favicon, maskable SVG and 192/512 px PNG icons, plus a service worker built with `vite-plugin-pwa` and Workbox. Serve `dist/` at the origin root over trusted HTTPS. Development does not register a worker. After the first successful cache installation, the built app shell, fonts/styles, icons and lazy PDF engine work offline. IndexedDB owns projects, preferences and image assets independently of the cache. Clearing site data removes both; keep backups elsewhere. Use the browser install control or **Install app** when the browser offers it. Installation UI varies by platform.
 
+Successful cache registration stays silent, including repeated online and offline reloads. Only installation actions, available updates and cache errors show a notice.
+
 **App update available → Save and update** saves committed work before activation and checks again before reloading. Finish/cancel drawing, dragging and open dialogs first. Save failures, quota errors and edits arriving during the save prevent reload. Other tabs stay open, including unfinished drafts. Earlier app-shell caches are retained so older tabs can still load their lazy chunks. This uses more cache storage across releases; clear obsolete site caches only after closing older tabs and keeping external project backups. Cache installation or worker registration errors show a warning and retain the current document. The app never clears IndexedDB to repair an update.
 
 Run the production browser acceptance suite separately from the development suite:
