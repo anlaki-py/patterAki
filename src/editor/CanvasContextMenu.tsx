@@ -1,3 +1,4 @@
+import { MarkClipboardItems, MarkPasteItem } from "../ui/MarkClipboardItems";
 import { pieceForEdge } from "../document/pieces";
 import { usePieceActions } from "../ui/PieceActions";
 import { distance } from "../geometry/line";
@@ -211,6 +212,7 @@ export function CanvasContextMenu({
           })}
         </Menu.ContextMenu>
         <Menu.Dropdown>
+          {target?.kind === "edge" && <MarkPasteItem point={target.point} />}
           {edge && !pieceContext && target?.kind === "edge" && (
             <Menu.Item
               onClick={() => {
@@ -256,6 +258,7 @@ export function CanvasContextMenu({
                 })}
                 leftSection={<Pencil size={16} />}
               />
+              <MarkClipboardItems point={target.point} />
               <CommandMenuItem
                 command={report(commands.delete.bind())}
                 color="red"
@@ -264,7 +267,11 @@ export function CanvasContextMenu({
             </>
           )}
           {target?.kind === "empty" && (
-            <MarkMenuItems onAdd={(kind) => add(kind, target.point)} />
+            <>
+              <MarkPasteItem point={target.point} />
+              <Menu.Divider />
+              <MarkMenuItems onAdd={(kind) => add(kind, target.point)} />
+            </>
           )}
         </Menu.Dropdown>
       </Menu>
@@ -316,6 +323,8 @@ export function CanvasContextMenu({
             <Button variant="default">Marks</Button>
           </Menu.Target>
           <Menu.Dropdown>
+            <MarkClipboardItems />
+            <Menu.Divider />
             {selectedMark && (
               <>
                 <CommandMenuItem

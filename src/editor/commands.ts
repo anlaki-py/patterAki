@@ -1,3 +1,4 @@
+import { markClipboardCommands } from "./markClipboard";
 import { seamCommands } from "./seamCommands";
 import { sewingCommands } from "./sewingCommands";
 import { pieceEdges } from "../document/pieces";
@@ -86,6 +87,7 @@ export const nudgeCommands = nudgeDirections.flatMap(
   ],
 );
 export const commands = {
+  ...markClipboardCommands,
   ...seamCommands,
   openSeam: localCommand("seam.open", "Seam allowance…"),
   ...geometryCommands,
@@ -247,4 +249,8 @@ export const editCommands = [
     },
   }),
   commands.selectAll.bind(),
+  commands.copyMarks.bind(),
+  commands.cutMarks.bind(),
+  commands.duplicateMarks.bind(),
+  commands.pasteMarks.bind(undefined),
 ];

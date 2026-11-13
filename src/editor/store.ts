@@ -1,3 +1,4 @@
+import type { Annotation } from "../document/annotationSchema";
 import { seamIssue } from "../document/seamAllowance";
 import { pieceEdges } from "../document/pieces";
 import type { Anchor } from "../geometry/line";
@@ -16,6 +17,7 @@ import {
 export type Tool =
   "select" | "line" | "polyline" | "rectangle" | "curve" | "point" | "pan";
 type State = {
+  markClipboard: { marks: Annotation[]; pasteCount: number } | null;
   outlineVisibility: "stitch" | "cut" | "both";
   editPieceId: string | null;
   lengthAnchor: Anchor;
@@ -58,6 +60,7 @@ type State = {
   applySettings: (settings: EditorSettings) => void;
 };
 export const useEditor = create<State>((set, get) => ({
+  markClipboard: null,
   outlineVisibility: "both",
   editPieceId: null,
   lengthAnchor: "start",
