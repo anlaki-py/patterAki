@@ -1,3 +1,4 @@
+import { isFastener } from "./fastenerSchema";
 import { referenceSchema } from "./referenceSchema";
 import { validateSewing } from "./sewingValidation";
 import {
@@ -14,7 +15,7 @@ import {
 export { patternPieceSchema, type PatternPiece } from "./pieceSchema";
 import { z } from "zod";
 import { annotationInRange } from "./annotationGeometry";
-import { annotationSchema } from "./annotationSchema";
+import { annotationSchema, legacyAnnotationSchema } from "./annotationSchema";
 import { constructionGuideSchema } from "./guideSchema";
 import {
   validateContourSegments,
@@ -90,7 +91,7 @@ const version3Schema = z
   .object({
     ...version2Base.shape,
     schemaVersion: z.literal(3),
-    annotations: z.record(z.string(), annotationSchema),
+    annotations: z.record(z.string(), legacyAnnotationSchema),
   })
   .strict()
   .superRefine(validateSegments)
@@ -111,7 +112,7 @@ const version4Schema = z
   .object({
     ...version2Base.shape,
     schemaVersion: z.literal(4),
-    annotations: z.record(z.string(), annotationSchema),
+    annotations: z.record(z.string(), legacyAnnotationSchema),
     guides: z.record(z.string(), constructionGuideSchema),
   })
   .strict()
@@ -415,7 +416,7 @@ const version9Schema = z
         ctx.addIssue({ code: "custom", message: issue.message });
   });
 
-const currentSchema = z
+const version10Schema = z
   .object({
     ...version9Schema.shape,
     schemaVersion: z.literal(10),
@@ -445,6 +446,46 @@ const currentSchema = z
         ctx.addIssue({
           code: "custom",
           message: "Reference identity mismatch.",
+        });
+  });
+
+const currentSchema = z
+  .object({
+    ...version10Schema.shape,
+    schemaVersion: z.literal(11),
+    annotations: z.record(z.string(), annotationSchema),
+  })
+  .strict()
+  .superRefine((doc, ctx) => {
+    // Reuse historical topology checks with all mark IDs retained. New shapes
+    // are validated above and their actual physical extent is checked below.
+    const topology = version10Schema.safeParse({
+      ...doc,
+      schemaVersion: 10,
+      annotations: Object.fromEntries(
+        Object.entries(doc.annotations).map(([id, mark]) => [
+          id,
+          !isFastener(mark)
+            ? mark
+            : {
+                id: mark.id,
+                kind: "drill",
+                position: { x: 0, y: 0 },
+                rotation: 0,
+                sizeMm: 1,
+              },
+        ]),
+      ),
+    });
+    if (!topology.success)
+      for (const issue of topology.error.issues)
+        ctx.addIssue({ code: "custom", message: issue.message });
+    for (const mark of Object.values(doc.annotations))
+      if (isFastener(mark) && !annotationInRange(mark))
+        ctx.addIssue({
+          code: "custom",
+          message:
+            "Keep the entire mark inside the supported coordinate range.",
         });
   });
 
@@ -524,11 +565,16 @@ export const documentSchema = z.preprocess((input) => {
     if (!legacy.success) return input;
     candidate = { ...legacy.data, schemaVersion: 10 };
   }
+  if (candidate.schemaVersion === 10) {
+    const legacy = version10Schema.safeParse(candidate);
+    if (!legacy.success) return input;
+    candidate = { ...legacy.data, schemaVersion: 11 };
+  }
   return candidate;
 }, currentSchema);
 export type PatternDocument = z.infer<typeof documentSchema>;
 export const emptyDocument = (id: string): PatternDocument => ({
-  schemaVersion: 10,
+  schemaVersion: 11,
   annotations: {},
   guides: {},
   pieces: {},

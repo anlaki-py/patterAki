@@ -1,3 +1,5 @@
+import { markCurvePath } from "../geometry/markCurves";
+import type { Cubic } from "../geometry/bezier";
 import { documentSchema, type PatternDocument } from "../document/schema";
 import { segmentPath } from "../document/segments";
 import { cutOutline } from "../document/seamAllowance";
@@ -147,6 +149,8 @@ export function pdfDrawing(
           end = transform(b);
         path(`M ${start.x} ${start.y} L ${end.x} ${end.y}`, mark.kind);
       }
+      for (const curve of shape.curves ?? [])
+        path(markCurvePath(curve.map(transform) as Cubic), mark.kind);
       for (const c of shape.circles)
         circles.push({ center: transform(c.center), radius: c.radius });
       if (layers.text)

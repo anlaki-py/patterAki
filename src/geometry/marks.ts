@@ -1,4 +1,5 @@
-import { lineTouchesBox, type Bounds } from "./bounds";
+import type { Cubic } from "./bezier";
+import { cubicTouchesBox, lineTouchesBox, type Bounds } from "./bounds";
 import { distance, type Vec2 } from "./line";
 export type MarkLine = [Vec2, Vec2];
 export type MarkText = {
@@ -9,6 +10,7 @@ export type MarkText = {
 };
 export type MarkShape = {
   lines: MarkLine[];
+  curves?: Cubic[];
   circles: { center: Vec2; radius: number }[];
   texts: MarkText[];
 };
@@ -42,6 +44,12 @@ export function markTouchesBox(
   if (
     shape.lines.some(([a, b]) =>
       lineTouchesBox(transform(a), transform(b), box),
+    )
+  )
+    return true;
+  if (
+    shape.curves?.some((curve) =>
+      cubicTouchesBox(curve.map(transform) as Cubic, box),
     )
   )
     return true;
@@ -81,6 +89,7 @@ export function markBounds(
   const transform = (p: Vec2) => transformMarkPoint(p, position, rotation);
   const points = [
     ...shape.lines.flat().map(transform),
+    ...(shape.curves ?? []).flat().map(transform),
     ...shape.texts.flatMap(textCorners).map(transform),
     ...shape.circles.flatMap(({ center, radius }) => {
       const p = transform(center);

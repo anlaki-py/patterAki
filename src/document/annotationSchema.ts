@@ -1,3 +1,4 @@
+import { fastenerSchemas } from "./fastenerSchema";
 import { z } from "zod";
 const coordinate = z.number().finite().min(-1e7).max(1e7);
 const base = {
@@ -12,7 +13,7 @@ const directional = {
   label: z.string().max(120),
   fontSizeMm,
 };
-export const annotationSchema = z.discriminatedUnion("kind", [
+export const legacyAnnotationSchema = z.discriminatedUnion("kind", [
   z
     .object({
       ...base,
@@ -35,6 +36,10 @@ export const annotationSchema = z.discriminatedUnion("kind", [
       sizeMm: z.number().finite().min(1).max(1000),
     })
     .strict(),
+]);
+export const annotationSchema = z.discriminatedUnion("kind", [
+  ...legacyAnnotationSchema.options,
+  ...fastenerSchemas.map((schema) => schema.safeExtend(base)),
 ]);
 export type Annotation = z.infer<typeof annotationSchema>;
 export type AnnotationKind = Annotation["kind"];

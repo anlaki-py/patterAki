@@ -1,3 +1,5 @@
+import { isFastener } from "./fastenerSchema";
+import { fastenerShape } from "./fastenerGeometry";
 import type { Annotation } from "./annotationSchema";
 import type { MarkShape, MarkText } from "../geometry/marks";
 import { markBounds, markTouchesBox } from "../geometry/marks";
@@ -12,6 +14,7 @@ function textLines(text: string, size: number, y = 0): MarkText[] {
   }));
 }
 export function annotationShape(mark: Annotation): MarkShape {
+  if (isFastener(mark)) return fastenerShape(mark);
   const shape: MarkShape = { lines: [], circles: [], texts: [] };
   if (mark.kind === "text") {
     shape.texts = textLines(mark.text, mark.fontSizeMm);

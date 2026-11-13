@@ -1,3 +1,4 @@
+import { markCurvePath } from "../geometry/markCurves";
 import type { Annotation } from "../document/annotationSchema";
 import { annotationShape } from "../document/annotationGeometry";
 import { markBounds } from "../geometry/marks";
@@ -8,6 +9,9 @@ export function exportAnnotation(mark: Annotation) {
   const body = [
     ...shape.lines.map(
       ([a, b]) => `<path d="M ${a.x} ${a.y} L ${b.x} ${b.y}"/>`,
+    ),
+    ...(shape.curves ?? []).map(
+      (curve) => `<path d="${markCurvePath(curve)}"/>`,
     ),
     ...shape.circles.map(
       (c) => `<circle cx="${c.center.x}" cy="${c.center.y}" r="${c.radius}"/>`,

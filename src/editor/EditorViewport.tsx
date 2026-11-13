@@ -1,3 +1,4 @@
+import { contextTarget } from "./contextTarget";
 import { ReferenceLayer } from "./ReferenceLayer";
 import { itemEditable } from "../document/pieceAccess";
 import { pieceForEdge } from "../document/pieces";
@@ -1087,9 +1088,19 @@ export function EditorViewport() {
                 return;
               }
               if (s.tool === "line") return;
-              const markId = (e.target as SVGElement).closest<SVGElement>(
-                "[data-annotation]",
-              )?.dataset.annotation;
+              // Pointer capture can retarget the browser's double-click to the
+              // SVG root. Resolve the physical mark there as well as its DOM hit.
+              const hit = contextTarget(
+                s.document,
+                position(e),
+                7 / view.scale,
+                {
+                  annotation: (e.target as SVGElement).closest<SVGElement>(
+                    "[data-annotation]",
+                  )?.dataset.annotation,
+                },
+              );
+              const markId = hit.kind === "annotation" ? hit.id : undefined;
               if (s.tool === "select" && markId) {
                 annotations.edit(markId);
                 return;

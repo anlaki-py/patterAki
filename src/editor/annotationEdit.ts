@@ -1,3 +1,9 @@
+import { isFastener } from "../document/fastenerSchema";
+import {
+  editedFastener,
+  fastenerFields,
+  type FastenerFields,
+} from "./fastenerEdit";
 import type { Annotation } from "../document/annotationSchema";
 import { putAnnotation } from "../document/annotations";
 import { unitFactor, type PatternDocument } from "../document/schema";
@@ -9,6 +15,7 @@ export type AnnotationSession = {
   cancelVersion: number;
 };
 export type AnnotationFields = {
+  fastener?: FastenerFields;
   text: string;
   size: number | string;
   length: number | string;
@@ -18,6 +25,14 @@ export function annotationFields(
   mark: Annotation,
   units: PatternDocument["unitsDisplay"],
 ): AnnotationFields {
+  if (isFastener(mark))
+    return {
+      text: "",
+      size: 1,
+      length: 1,
+      rotation: mark.rotation,
+      fastener: fastenerFields(mark, unitFactor[units]),
+    };
   return {
     text:
       mark.kind === "text"
@@ -37,6 +52,26 @@ export function previewAnnotation(
   fields: AnnotationFields,
 ): PatternDocument {
   const factor = unitFactor[session.base.unitsDisplay];
+  const mark = session.annotation;
+  if (
+    typeof fields.rotation !== "number" ||
+    !Number.isFinite(fields.rotation) ||
+    Math.abs(fields.rotation) > 360
+  )
+    throw new Error("Enter an angle between -360° and 360°.");
+  if (isFastener(mark)) {
+    if (!fields.fastener)
+      throw new Error("Reopen the mark editor to edit its dimensions.");
+
+    return putAnnotation(
+      session.base,
+      editedFastener(
+        { ...mark, rotation: fields.rotation },
+        fields.fastener,
+        factor,
+      ),
+    );
+  }
   if (
     typeof fields.size !== "number" ||
     !Number.isFinite(fields.size) ||
@@ -44,13 +79,7 @@ export function previewAnnotation(
     fields.size * factor > 1000
   )
     throw new Error("Size must be between 1 and 1000 mm.");
-  if (
-    typeof fields.rotation !== "number" ||
-    !Number.isFinite(fields.rotation) ||
-    Math.abs(fields.rotation) > 360
-  )
-    throw new Error("Enter an angle between -360° and 360°.");
-  const mark = session.annotation;
+
   const base = { ...mark, rotation: fields.rotation };
   if (mark.kind === "text") {
     if (!fields.text.trim() || fields.text.length > 1000)

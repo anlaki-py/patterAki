@@ -12,6 +12,36 @@ export function newAnnotation(
   id: string,
 ): Annotation {
   const base = { id, position: { ...position }, rotation: 0 };
+  if (kind === "button")
+    return {
+      ...base,
+      kind,
+      shape: "ellipse",
+      widthMm: 15,
+      heightMm: 15,
+      holes: "four",
+      holeDiameterMm: 1.5,
+      holeSpacingMm: 4,
+    };
+  if (kind === "buttonhole")
+    return {
+      ...base,
+      kind,
+      style: "straight",
+      lengthMm: 20,
+      widthMm: 1.5,
+      eyeLengthMm: 4,
+      eyeWidthMm: 4,
+    };
+  if (kind === "eyelet" || kind === "snap")
+    return {
+      ...base,
+      kind,
+      diameterMm: kind === "eyelet" ? 8 : 12,
+      openingMm: 4,
+    };
+  if (kind === "bartack")
+    return { ...base, kind, lengthMm: 10, widthMm: 2, stitches: 8 };
   if (kind === "text")
     return { ...base, kind, text: "Pattern name\nCut 2", fontSizeMm: 5 };
   if (kind === "drill") return { ...base, kind, sizeMm: 4 };

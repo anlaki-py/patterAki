@@ -200,6 +200,11 @@ export const commands = {
   arrow: localCommand("mark.arrow", "Arrow…"),
   grainline: localCommand("mark.grainline", "Grainline…"),
   fold: localCommand("mark.fold", "Place on fold guide…"),
+  button: localCommand("mark.button", "Button…"),
+  buttonhole: localCommand("mark.buttonhole", "Buttonhole…"),
+  eyelet: localCommand("mark.eyelet", "Eyelet…"),
+  snapMark: localCommand("mark.snap", "Snap fastener…"),
+  bartack: localCommand("mark.bartack", "Bar tack…"),
   drill: localCommand("mark.drill", "Drill point / cross…"),
   applyMark: localCommand("mark.apply", "Apply mark", [
     { key: "Enter" },

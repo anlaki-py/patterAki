@@ -1,3 +1,4 @@
+import { markCurvePath } from "../geometry/markCurves";
 import type { PatternDocument } from "../document/schema";
 import { annotationShape } from "../document/annotationGeometry";
 export function SvgAnnotations({
@@ -26,7 +27,9 @@ export function SvgAnnotations({
                 ? mark.text
                 : mark.kind === "drill"
                   ? "Drill point"
-                  : mark.label || "Arrow"}
+                  : "label" in mark
+                    ? mark.label || mark.kind
+                    : mark.kind}
               . Drag to move; double-click to edit.
             </title>
             {shape.lines.map(([a, b], i) => (
@@ -46,6 +49,21 @@ export function SvgAnnotations({
                   y1={a.y}
                   x2={b.x}
                   y2={b.y}
+                  stroke="transparent"
+                  strokeWidth={Math.max(0.35, 14 / scale)}
+                />
+              </g>
+            ))}
+            {shape.curves?.map((curve, i) => (
+              <g key={`curve-${i}`}>
+                <path
+                  d={markCurvePath(curve)}
+                  className="annotation-stroke"
+                  fill="none"
+                />
+                <path
+                  d={markCurvePath(curve)}
+                  fill="none"
                   stroke="transparent"
                   strokeWidth={Math.max(0.35, 14 / scale)}
                 />

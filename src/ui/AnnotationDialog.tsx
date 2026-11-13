@@ -1,3 +1,5 @@
+import { isFastener } from "../document/fastenerSchema";
+import { FastenerControls } from "./FastenerControls";
 import { useEffect, useMemo, useState } from "react";
 import {
   Button,
@@ -31,6 +33,7 @@ export function AnnotationDialog({
   );
   const [commitError, setCommitError] = useState("");
   const { kind } = session.annotation;
+  const fastener = isFastener(session.annotation) ? session.annotation : null;
   const units = session.base.unitsDisplay;
   const result = useMemo(() => {
     try {
@@ -76,48 +79,59 @@ export function AnnotationDialog({
         }}
       >
         <Stack gap="sm">
-          {kind === "text" ? (
-            <Textarea
-              label="Text"
-              data-autofocus
-              autosize
-              minRows={3}
-              maxRows={8}
-              maxLength={1000}
-              value={fields.text}
-              onChange={(e) =>
-                setFields({ ...fields, text: e.currentTarget.value })
-              }
-              onKeyDown={(e) => {
-                if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-                  e.preventDefault();
-                  applyCommand.run();
-                }
-              }}
+          {fastener && fields.fastener ? (
+            <FastenerControls
+              kind={fastener.kind}
+              fields={fields.fastener}
+              units={units}
+              onChange={(value) => setFields({ ...fields, fastener: value })}
             />
           ) : (
-            kind !== "drill" && (
-              <TextInput
-                label="Label (optional)"
-                maxLength={120}
-                value={fields.text}
-                onChange={(e) =>
-                  setFields({ ...fields, text: e.currentTarget.value })
-                }
+            <>
+              {kind === "text" ? (
+                <Textarea
+                  label="Text"
+                  data-autofocus
+                  autosize
+                  minRows={3}
+                  maxRows={8}
+                  maxLength={1000}
+                  value={fields.text}
+                  onChange={(e) =>
+                    setFields({ ...fields, text: e.currentTarget.value })
+                  }
+                  onKeyDown={(e) => {
+                    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+                      e.preventDefault();
+                      applyCommand.run();
+                    }
+                  }}
+                />
+              ) : (
+                kind !== "drill" && (
+                  <TextInput
+                    label="Label (optional)"
+                    maxLength={120}
+                    value={fields.text}
+                    onChange={(e) =>
+                      setFields({ ...fields, text: e.currentTarget.value })
+                    }
+                  />
+                )
+              )}
+              <NumberInput
+                label={`${kind === "drill" ? "Mark diameter" : "Text size"} (${units})`}
+                value={fields.size}
+                onChange={(size) => setFields({ ...fields, size })}
               />
-            )
-          )}
-          <NumberInput
-            label={`${kind === "drill" ? "Mark diameter" : "Text size"} (${units})`}
-            value={fields.size}
-            onChange={(size) => setFields({ ...fields, size })}
-          />
-          {kind !== "text" && kind !== "drill" && (
-            <NumberInput
-              label={`Length (${units})`}
-              value={fields.length}
-              onChange={(length) => setFields({ ...fields, length })}
-            />
+              {kind !== "text" && kind !== "drill" && (
+                <NumberInput
+                  label={`Length (${units})`}
+                  value={fields.length}
+                  onChange={(length) => setFields({ ...fields, length })}
+                />
+              )}
+            </>
           )}
           {kind !== "drill" && (
             <NumberInput

@@ -5,6 +5,11 @@ import {
   Crosshair,
   FoldVertical,
   Type,
+  Circle,
+  CircleDot,
+  CircleDashed,
+  RectangleHorizontal,
+  AlignJustify,
 } from "lucide-react";
 import type { AnnotationKind } from "../document/annotationSchema";
 import { commands } from "../editor/commands";
@@ -15,6 +20,11 @@ const icons = {
   grainline: ArrowLeftRight,
   fold: FoldVertical,
   drill: Crosshair,
+  button: CircleDot,
+  buttonhole: RectangleHorizontal,
+  eyelet: Circle,
+  snap: CircleDashed,
+  bartack: AlignJustify,
 };
 export function MarkMenuItems({
   onAdd,
@@ -29,7 +39,10 @@ export function MarkMenuItems({
         return (
           <CommandMenuItem
             key={kind}
-            command={commands[kind].bind({ execute: () => onAdd(kind) })}
+            command={(kind === "snap"
+              ? commands.snapMark
+              : commands[kind]
+            ).bind({ execute: () => onAdd(kind) })}
             leftSection={<Icon size={16} />}
           />
         );
