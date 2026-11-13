@@ -1,3 +1,5 @@
+import { ReferenceDialog } from "../ui/ReferenceImagesDialog";
+import { PwaStatus } from "./PwaStatus";
 import { useEffect, useRef, useState } from "react";
 import {
   ActionIcon,
@@ -41,7 +43,7 @@ import { CommandMenuItem, commandProps } from "../ui/CommandControls";
 import { Inspector } from "../ui/Inspector";
 import { SnapSettings } from "../ui/SnapSettings";
 import { SaveFeedback } from "../ui/SaveFeedback";
-import { parseProject } from "../document/schema";
+import { importBackup } from "../persistence/referenceBackup";
 import { saveNow, startPersistence } from "../persistence/autosave";
 import {
   defaultWorkspaceLayout,
@@ -68,6 +70,7 @@ const icons = {
 export function App() {
   const s = useEditor();
   const mobile = useMediaQuery("(max-width: 760px)");
+  const [references, setReferences] = useState(false);
   const [pdfExport, setPdfExport] = useState(false);
   const [svgExport, setSvgExport] = useState(false);
   const [layout, setLayout] = useState(readWorkspaceLayout);
@@ -98,6 +101,7 @@ export function App() {
       ),
     });
   const fileCommands = [
+    commands.referenceImages.bind({ execute: () => setReferences(true) }),
     commands.newProject.bind({
       execute: () => {
         void projectActions.create();
@@ -146,6 +150,8 @@ export function App() {
   if (!s.ready) return <Text p="md">Opening local pattern…</Text>;
   return (
     <div className="app-shell">
+      <PwaStatus />
+      {references && <ReferenceDialog onClose={() => setReferences(false)} />}
       <Group className="menu-bar" gap={0} justify="space-between" wrap="nowrap">
         <Group gap={0} wrap="nowrap">
           <Menu>
@@ -400,16 +406,15 @@ export function App() {
           e.currentTarget.value = "";
           if (!picked) return;
           try {
-            if (picked.size > 10_000_000)
-              throw new Error("Project exceeds the 10 MB import limit.");
-            const doc = parseProject(await picked.text());
+            if (picked.size > 100_000_000)
+              throw new Error("Backup exceeds the 100 MB import limit.");
+            const doc = await importBackup(await picked.text());
             void projectActions.importProject(doc);
-          } catch {
+          } catch (cause) {
             notifications.show({
               color: "red",
               title: "Import failed",
-              message:
-                "Choose a valid version 1–9 PatternAki JSON project under 10 MB. Your current pattern is unchanged.",
+              message: `${cause instanceof Error ? cause.message : "Invalid project backup."} Your current pattern is unchanged.`,
             });
           }
         }}

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { reviewSvg } from "../export/referenceReview";
+import { useEffect, useRef, useState } from "react";
 import { Button, Checkbox, Group, Select, Stack, Text } from "@mantine/core";
 import { useEditor } from "../editor/store";
 import { pieceForItem } from "../document/pieceAccess";
@@ -7,6 +8,17 @@ import { downloadSvg } from "../export/download";
 import { DraggableModal } from "./DraggableModal";
 
 export function SvgExportDialog({ onClose }: { onClose: () => void }) {
+  const cancelled = useRef(false);
+  useEffect(() => {
+    cancelled.current = false;
+    return () => {
+      cancelled.current = true;
+    };
+  }, []);
+  const close = () => {
+    cancelled.current = true;
+    onClose();
+  };
   const s = useEditor();
   const selected = [
     ...new Set(
@@ -28,6 +40,8 @@ export function SvgExportDialog({ onClose }: { onClose: () => void }) {
       metadata: true,
     },
   );
+  const [underlay, setUnderlay] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const pieces = Object.values(s.document.pieces).filter((p) => p.visible);
   const ids = scope === "all" ? pieces.map((p) => p.id) : selected;
@@ -39,7 +53,7 @@ export function SvgExportDialog({ onClose }: { onClose: () => void }) {
     options.internal ||
     options.metadata;
   return (
-    <DraggableModal title="Export vector SVG" onClose={onClose}>
+    <DraggableModal title="Export vector SVG" onClose={close}>
       <Stack gap="sm">
         <Select
           label="Export scope"
@@ -73,6 +87,18 @@ export function SvgExportDialog({ onClose }: { onClose: () => void }) {
             }}
           />
         ))}
+        <Checkbox
+          label="Reference underlay for review only"
+          checked={underlay}
+          onChange={(e) => setUnderlay(e.currentTarget.checked)}
+        />
+        {underlay && (
+          <Text size="xs" c="orange">
+            Review SVG includes visible raster references within the pattern
+            bounds. Photos may be uncalibrated or distorted. Manufacturing
+            SVG/PDF excludes them by default.
+          </Text>
+        )}
         <Text size="xs">
           Physical dimensions use mm at 1:1 scale with a 10 mm margin. Hidden
           pieces are excluded. Internal paths follow their Export setting.
@@ -90,30 +116,38 @@ export function SvgExportDialog({ onClose }: { onClose: () => void }) {
           </Text>
         )}
         <Group justify="flex-end">
-          <Button variant="default" onClick={onClose}>
+          <Button variant="default" onClick={close}>
             Cancel
           </Button>
           <Button
-            disabled={!available || !ids.length || !hasLayer}
-            onClick={() => {
+            loading={busy}
+            disabled={!available || !ids.length || !hasLayer || busy}
+            onClick={async () => {
+              setBusy(true);
               try {
                 const svg = exportSvg(s.document, ids, {
                   ...options,
                   annotations: scope === "all",
                 });
+                const output = underlay
+                  ? await reviewSvg(svg, s.document)
+                  : svg;
+                if (cancelled.current) return;
                 downloadSvg(
-                  svg,
+                  output,
                   ids.length === 1
                     ? s.document.pieces[ids[0]].name
                     : s.document.name,
                 );
-                onClose();
+                close();
               } catch (cause) {
                 setError(
                   cause instanceof Error
                     ? cause.message
                     : "Could not export SVG.",
                 );
+              } finally {
+                setBusy(false);
               }
             }}
           >

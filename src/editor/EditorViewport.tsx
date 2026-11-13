@@ -1,3 +1,4 @@
+import { ReferenceLayer } from "./ReferenceLayer";
 import { itemEditable } from "../document/pieceAccess";
 import { pieceForEdge } from "../document/pieces";
 import { fitSelectionView } from "./fitView";
@@ -1183,6 +1184,7 @@ export function EditorViewport() {
             <g
               transform={`translate(${view.x} ${view.y}) scale(${view.scale})`}
             >
+              <ReferenceLayer doc={doc} />
               {placement.overlay}
               <g className={s.previewIssue ? "invalid-preview" : undefined}>
                 <SvgGeometry

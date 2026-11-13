@@ -1,3 +1,5 @@
+import { projectBackup } from "../persistence/referenceBackup";
+import { documentSchema } from "../document/schema";
 import { useRef } from "react";
 import { Button, Stack, Text } from "@mantine/core";
 import { modals } from "@mantine/modals";
@@ -355,7 +357,16 @@ export function useProjectActions() {
   const exportStored = async (id: string) => {
     const row = await db.projects.get(id);
     if (!row) throw new Error("This saved project no longer exists.");
-    downloadProjectJson(row.document ?? row, `Stored project ${id}`);
+    const parsed = documentSchema.safeParse(row.document);
+    downloadProjectJson(
+      parsed.success
+        ? await projectBackup(parsed.data).catch((cause) => {
+            reportError(cause);
+            return row.document;
+          })
+        : (row.document ?? row),
+      `Stored project ${id}`,
+    );
   };
   const actions: ProjectBrowserActions = {
     create: createNamed,

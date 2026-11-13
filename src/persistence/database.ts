@@ -25,8 +25,10 @@ export class ProjectDatabase extends Dexie {
     value: EditorSettings;
   }>;
   checkpoints!: Table<Checkpoint>;
+  assets!: Table<{ id: string; blob: Blob; mime: string }>;
   constructor(name = "patternaki") {
     super(name);
+    this.version(4).stores({ assets: "id" });
     this.version(1).stores({ projects: "id,updatedAt" });
     this.version(2).stores({ settings: "id" });
     this.version(3)

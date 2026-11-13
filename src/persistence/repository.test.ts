@@ -196,7 +196,7 @@ describe("atomic project records and recovery", () => {
     old.close();
     const upgraded = new ProjectDatabase(name);
     try {
-      expect((await latestProject(upgraded))?.schemaVersion).toBe(9);
+      expect((await latestProject(upgraded))?.schemaVersion).toBe(10);
       expect((await upgraded.projects.get("legacy"))!.document).toEqual(
         document,
       );

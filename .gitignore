@@ -35,3 +35,5 @@ dev-dist/
 .idea/
 .DS_Store
 Thumbs.db
+
+test-results-pwa/

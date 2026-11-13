@@ -188,19 +188,25 @@ Implementation and verification, 2026-11-12: a most-recently-edited catalog supp
 
 ### M4.2 Installable offline PWA [P1]
 
-- [ ] Add and configure `vite-plugin-pwa`, manifest, appropriate app icons, and a conservative built-asset cache strategy over trusted HTTPS.
-- [ ] Verify cold startup after initial installation/cache, fully offline editing, project reopening, and JSON backup without network access.
-- [ ] Prompt on new service-worker versions; **never auto-reload while an edit is in progress**. Commit/safeguard state before accepting an update.
-- [ ] Test storage migration and offline version updates; recover safely on service-worker or quota errors.
+- [x] Add and configure `vite-plugin-pwa`, manifest, appropriate app icons, and a conservative built-asset cache strategy over trusted HTTPS.
+- [x] Verify cold startup after initial installation/cache, fully offline editing, project reopening, and JSON backup without network access.
+- [x] Prompt on new service-worker versions; **never auto-reload while an edit is in progress**. Commit/safeguard state before accepting an update.
+- [x] Test storage migration and offline version updates; recover safely on service-worker or quota errors.
+
+Implementation and verification, 2026-11-13: production-only `vite-plugin-pwa`/Workbox precaching includes the app shell, lazy PDF engine, manifest and SVG/PNG icons. Explicit updates safeguard committed work, refuse drafts/dialogs and failed saves, and leave other tabs open. Six installed-Chromium production scenarios pass for cold offline launch, offline edit/reopen and complete image backup, waiting-worker updates, save/quota refusal, another tab’s unfinished draft, worker/cache installation failure and database/document migration through offline reload. A normal temporary Chromium profile reports no installability errors. Earlier shell caches remain available to older tabs. Trusted production HTTPS, native OS install UI and physical-device/cross-engine policy checks are documented separately in README; headless tests bypass only the local test certificate.
 
 ### M4.3 Reference images [P2, unless needed for an immediate workflow]
 
-- [ ] Store original PNG/JPEG file blobs as separate IndexedDB assets, not embedded base64 in every document snapshot.
-- [ ] Import into a lockable/translucent/rotatable reference layer; calibrate using two points with a known physical distance.
-- [ ] Offer four-corner perspective correction for angled photos, warnings about distortion, and tracing with existing line/curve tools. Do not claim uncalibrated photos are to scale.
-- [ ] Exclude reference bitmaps from manufacturing exports by default, with optional review underlay.
+- [x] Store original PNG/JPEG file blobs as separate IndexedDB assets, not embedded base64 in every document snapshot.
+- [x] Import into a lockable/translucent/rotatable reference layer; calibrate using two points with a known physical distance.
+- [x] Offer four-corner perspective correction for angled photos, warnings about distortion, and tracing with existing line/curve tools. Do not claim uncalibrated photos are to scale.
+- [x] Exclude reference bitmaps from manufacturing exports by default, with optional review underlay.
+
+Implementation and verification, 2026-11-13: schema 10 stores reference placement/calibration/corners while database v4 stores unchanged PNG/JPEG originals as separate blobs. A locked/translucent layer supports numeric rotation and placement, two-point calibration with exact pixel fields, and convex four-corner correction using the paper aspect ratio before recalibration. Geometry-only history remains immutable and undoable. Complete JSON backups include each shared original once, validate imports and remap assets; malformed/oversized/quota failures retain current geometry. Manufacturing SVG/PDF excludes bitmaps; an explicit SVG review option adds visible image underlays. Four installed-Chromium workflows verify calibrated 100 mm tracing, apply/cancel/undo/reload, byte-identical original download, 390 px perspective controls and distortion warnings, invalid/quota imports, manufacturing/review exports and fresh-store JPEG backup restoration. Original specifications are unchanged. Physical-image accuracy, lens distortion, native device installation and other engines remain the documented acceptance limits.
 
 **M4 gate:** create two projects, switch between them, close/reopen the app, import/export safely, survive a deliberately corrupt project without losing the current one, then reopen/edit a previously cached project while offline.
+
+M4 verification, 2026-11-13: the gate is covered by the project-safety regression and offline production workflows. All 524 unit tests, lint, formatting and build pass. The full development Chromium run passed 51/52; one existing project reload exceeded its 60-second test limit and passed an isolated recheck after raising that limit to 120 seconds. All 52 distinct development scenarios plus six production PWA scenarios are verified.
 
 ## M5. Browser acceptance, mobile usability, and release hardening [P0/P1]
 

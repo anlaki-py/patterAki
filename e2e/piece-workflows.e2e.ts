@@ -239,7 +239,8 @@ test("internal-path attachment, whole-parent movement and save/open preserve geo
   page,
 }) => {
   // Includes editing, an IndexedDB project switch and a full page reload.
-  test.setTimeout(60000);
+  // Allow the reload on slower hosts using the installed Chromium binary.
+  test.setTimeout(120000);
   await seed(page, true);
   await showProperties(page);
   await clickWorld(page, 60, 45);

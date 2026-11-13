@@ -1,3 +1,4 @@
+import { referenceSchema } from "./referenceSchema";
 import { validateSewing } from "./sewingValidation";
 import {
   patternPieceSchema,
@@ -390,7 +391,7 @@ const version8Schema = z
     validateSewing(doc, ctx);
   });
 
-const currentSchema = z
+const version9Schema = z
   .object({
     ...version8Schema.shape,
     schemaVersion: z.literal(9),
@@ -412,6 +413,39 @@ const currentSchema = z
     if (!legacy.success)
       for (const issue of legacy.error.issues)
         ctx.addIssue({ code: "custom", message: issue.message });
+  });
+
+const currentSchema = z
+  .object({
+    ...version9Schema.shape,
+    schemaVersion: z.literal(10),
+    references: z.record(z.string(), referenceSchema).optional(),
+  })
+  .strict()
+  .superRefine((doc, ctx) => {
+    const { references, ...rest } = doc;
+    const legacy = version9Schema.safeParse({ ...rest, schemaVersion: 9 });
+    if (!legacy.success)
+      for (const issue of legacy.error.issues)
+        ctx.addIssue({ code: "custom", message: issue.message });
+    if (Object.keys(references ?? {}).length > 100)
+      ctx.addIssue({
+        code: "custom",
+        message: "A project supports up to 100 reference layers.",
+      });
+    for (const [id, ref] of Object.entries(references ?? {}))
+      if (
+        id !== ref.id ||
+        doc.points[id] ||
+        doc.segments[id] ||
+        doc.pieces[id] ||
+        doc.annotations[id] ||
+        doc.guides[id]
+      )
+        ctx.addIssue({
+          code: "custom",
+          message: "Reference identity mismatch.",
+        });
   });
 
 // Validate each historical representation before migration: malformed v1–v4
@@ -485,11 +519,16 @@ export const documentSchema = z.preprocess((input) => {
     if (!legacy.success) return input;
     candidate = { ...legacy.data, schemaVersion: 9 };
   }
+  if (candidate.schemaVersion === 9) {
+    const legacy = version9Schema.safeParse(candidate);
+    if (!legacy.success) return input;
+    candidate = { ...legacy.data, schemaVersion: 10 };
+  }
   return candidate;
 }, currentSchema);
 export type PatternDocument = z.infer<typeof documentSchema>;
 export const emptyDocument = (id: string): PatternDocument => ({
-  schemaVersion: 9,
+  schemaVersion: 10,
   annotations: {},
   guides: {},
   pieces: {},
