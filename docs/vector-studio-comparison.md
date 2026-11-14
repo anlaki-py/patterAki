@@ -87,11 +87,13 @@ Two concrete examples deserve follow-up:
 
 ### 3. Bound history by retained geometry, not only step count
 
-**Observed:** `store.commit` runs Zod parsing, seam checks and JSON comparisons before storing another complete document. Zod parsing produces a new document graph, limiting structural sharing across committed snapshots. Keeping up to 100 snapshots bounds action count, but not memory relative to document size. Reference-image blobs are already kept out of history, which is correct.
+**Resolved for retention:** `historyBudget.ts` now limits undo and redo together to 100 retained states and 32 MiB of estimated document data. Commit, Undo and Redo all apply the policy, removing the farthest states first while preserving a contiguous timeline around the current drawing. Ties favor the inverse of the action just taken. One immediate inverse is retained even if it alone exceeds the estimate budget, so an oversized edit remains reversible. The current document is never trimmed or refused to make history fit.
 
-**Suggested next patch:** Measure commit cost and retained memory with realistic large patterns. Consider immutable change records or validated structural sharing, plus a geometry/size budget. Keep strict validation at load/import/storage boundaries. History improvements must not bypass topology or lock checks.
+The estimator includes nested geometry, topology, annotations, text, guides and reference metadata, with weakly cached weights for immutable documents. Shared data is charged per snapshot. This does not measure exact engine heap use or count current/preview documents, renderer caches, decoded images or IndexedDB recovery records. Removing a history reference permits weak render-cache entries to disappear once other document owners release their references.
 
-**Acceptance:** Long edit/undo/redo sequences restore exact geometry, failed edits preserve the redo stack, history trimming cannot affect the current drawing, and recovery/dirty status remains correct. Do not copy collaboration rebasing or timed coalescing without a separate need.
+**Verified:** Tests cover combined-stack bounds, exact boundaries, farthest-first trimming, the 100-step cap, failed/no-op preservation, branch/load behavior and exact traversal of retained snapshots. The default budget trims a 4,000-edge drawing before 30 edits. An 80,000-edge drawing exercises the single-oversized-state exception through real commit/undo/redo transitions. Existing schema, seam and lock validation still precedes history updates.
+
+**Still open:** Browser heap profiling and history-control acceptance. Full validated snapshots remain the representation; delta history, structural sharing and commit CPU improvements would require a separate measured change. Reference-image blobs already remain outside snapshots.
 
 ### 4. Finish touch interaction as a defined workflow
 

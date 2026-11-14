@@ -1,3 +1,4 @@
+import { boundedHistory } from "./historyBudget";
 import type { Annotation } from "../document/annotationSchema";
 import { seamIssue } from "../document/seamAllowance";
 import { pieceEdges } from "../document/pieces";
@@ -117,8 +118,7 @@ export const useEditor = create<State>((set, get) => ({
         s.selectedGuide && doc.guides[s.selectedGuide] ? s.selectedGuide : null,
       activePoint:
         s.activePoint && doc.points[s.activePoint] ? s.activePoint : null,
-      past: [...s.past.slice(-99), s.document],
-      future: [],
+      ...boundedHistory([...s.past, s.document], [], "past"),
       revision: s.revision + 1,
       preview: null,
       previewIssue: null,
@@ -136,8 +136,11 @@ export const useEditor = create<State>((set, get) => ({
       set({
         document: doc,
         editPieceId: null,
-        past: s.past.slice(0, -1),
-        future: [s.document, ...s.future],
+        ...boundedHistory(
+          s.past.slice(0, -1),
+          [s.document, ...s.future],
+          "future",
+        ),
         selected: [],
         selectedGuide: null,
         activePoint: null,
@@ -157,8 +160,7 @@ export const useEditor = create<State>((set, get) => ({
       set({
         document: doc,
         editPieceId: null,
-        past: [...s.past, s.document],
-        future: s.future.slice(1),
+        ...boundedHistory([...s.past, s.document], s.future.slice(1), "past"),
         selected: [],
         selectedGuide: null,
         activePoint: null,
