@@ -1,3 +1,4 @@
+import { memo } from "react";
 import {
   referenceDimensions,
   type ReferenceImage,
@@ -27,7 +28,11 @@ function ReferenceRaster({ reference: r }: { reference: ReferenceImage }) {
     </>
   );
 }
-export function ReferenceLayer({ doc }: { doc: PatternDocument }) {
+export const ReferenceLayer = memo(function ReferenceLayer({
+  doc,
+}: {
+  doc: PatternDocument;
+}) {
   return (
     <g pointerEvents="none" data-layer="references">
       {Object.values(doc.references ?? {})
@@ -37,4 +42,4 @@ export function ReferenceLayer({ doc }: { doc: PatternDocument }) {
         ))}
     </g>
   );
-}
+});

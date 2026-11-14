@@ -36,6 +36,7 @@ import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { Button, Group, Menu, Text } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useEditor } from "./store";
+import { useShallow } from "zustand/react/shallow";
 import { addPath, splitLine } from "../document/operations";
 import { angle, distance, type Vec2 } from "../geometry/line";
 import type { SnapCandidate, SnapLock } from "../geometry/snapping";
@@ -106,7 +107,31 @@ function candidateLabel(candidate: SnapCandidate) {
 }
 
 export function EditorViewport() {
-  const s = useEditor();
+  const s = useEditor(
+    useShallow((state) => ({
+      document: state.document,
+      preview: state.preview,
+      previewIssue: state.previewIssue,
+      selected: state.selected,
+      selectedGuide: state.selectedGuide,
+      activePoint: state.activePoint,
+      editPieceId: state.editPieceId,
+      tool: state.tool,
+      revision: state.revision,
+      cancelVersion: state.cancelVersion,
+      gestureActive: state.gestureActive,
+      grid: state.grid,
+      gridSpacingMm: state.gridSpacingMm,
+      gridMajorEvery: state.gridMajorEvery,
+      showGuides: state.showGuides,
+      showRulers: state.showRulers,
+      snap: state.snap,
+      mouseRadiusPx: state.mouseRadiusPx,
+      touchRadiusPx: state.touchRadiusPx,
+      commit: state.commit,
+      cancel: state.cancel,
+    })),
+  );
   const svg = useRef<SVGSVGElement>(null);
   const canvas = useRef<HTMLDivElement>(null);
   const [view, setView] = useState({ x: 40, y: 40, scale: 2 });

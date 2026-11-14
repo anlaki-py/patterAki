@@ -357,3 +357,13 @@ Switching windows or tabs preserves placed Line/Polyline points, a rectangle's o
 Unit regressions cover draft/history preservation, invalid-preview cleanup, synchronous curve/group interruption, delayed controller events and explicit cancellation/tool changes. Three added Playwright scenarios cover draft coordinates/exact input, cancelled edge dragging and temporary pan. They were not run in this environment. Real focus changes, pointer capture, file-dialog behavior and physical devices remain pending browser acceptance.
 
 Focus-loss verification on 2026-11-14: all 626 unit tests, lint, formatting and production build pass on Node 24.18.1. The existing main-chunk size warning remains. Browser scenarios are added but unverified.
+
+## Reuse unchanged artwork
+
+Pointer-only updates keep transient draft, snap and movement overlays live while memoized SVG artwork, annotations, references, sewing marks, guides and dimensions reuse unchanged props. The viewport and its editor hooks subscribe only to their relevant store fields. Selection and zoom still update hit targets, handles and display sizes.
+
+A renderer-only WeakMap caches visible geometry, piece ownership and stitching/segment paths by immutable document identity. Cutting paths are calculated only when requested and reused for that document. New preview/committed documents get new data; cancel and undo/redo restore the matching cached geometry. Invalid cutting previews remain omitted until a changed document permits another calculation. None of this derived data is serialized or autosaved, and the canonical geometry/export algorithms are unchanged.
+
+A 32-piece, ten-render regression reduced cut-path computations from 320 to 32 and segment-path computations from 2,560 to 128 while varying selection, editing context and zoom. Tests cover geometry/seam changes, visibility, locked hit targets, cancel, undo/redo and failed-preview recovery. These are computation counts from server rendering, not measured browser frame rates. Browser profiling and interaction acceptance for large drawings, live previews, pan/zoom and reference images remain pending. Stationary snapping indexes and history memory budgets remain separate work.
+
+Artwork verification on 2026-11-14: all 634 unit tests, lint, formatting and production build pass on Node 24.18.1. The existing main-chunk size warning remains. No browser profiling or interaction checks were run for this change.

@@ -1,7 +1,8 @@
+import { memo, useMemo } from "react";
 import { markCurvePath } from "../geometry/markCurves";
 import type { PatternDocument } from "../document/schema";
 import { annotationShape } from "../document/annotationGeometry";
-export function SvgAnnotations({
+export const SvgAnnotations = memo(function SvgAnnotations({
   doc,
   selected,
   scale,
@@ -11,10 +12,17 @@ export function SvgAnnotations({
   scale: number;
 }) {
   const selection = new Set(selected);
+  const marks = useMemo(
+    () =>
+      Object.values(doc.annotations).map((mark) => {
+        const shape = annotationShape(mark);
+        return { mark, shape, curves: shape.curves?.map(markCurvePath) ?? [] };
+      }),
+    [doc.annotations],
+  );
   return (
     <g>
-      {Object.values(doc.annotations).map((mark) => {
-        const shape = annotationShape(mark);
+      {marks.map(({ mark, shape, curves }) => {
         return (
           <g
             key={mark.id}
@@ -54,15 +62,11 @@ export function SvgAnnotations({
                 />
               </g>
             ))}
-            {shape.curves?.map((curve, i) => (
+            {curves.map((path, i) => (
               <g key={`curve-${i}`}>
+                <path d={path} className="annotation-stroke" fill="none" />
                 <path
-                  d={markCurvePath(curve)}
-                  className="annotation-stroke"
-                  fill="none"
-                />
-                <path
-                  d={markCurvePath(curve)}
+                  d={path}
                   fill="none"
                   stroke="transparent"
                   strokeWidth={Math.max(0.35, 14 / scale)}
@@ -114,4 +118,4 @@ export function SvgAnnotations({
       })}
     </g>
   );
-}
+});

@@ -1,6 +1,11 @@
+import { memo } from "react";
 import type { PatternDocument } from "../document/schema";
 import { roleDash, sewingDrawing } from "../document/sewingDrawing";
-export function SvgSewing({ doc }: { doc: PatternDocument }) {
+export const SvgSewing = memo(function SvgSewing({
+  doc,
+}: {
+  doc: PatternDocument;
+}) {
   return (
     <g pointerEvents="none" className="sewing-marks">
       {Object.values(doc.pieces)
@@ -37,4 +42,4 @@ export function SvgSewing({ doc }: { doc: PatternDocument }) {
         )}
     </g>
   );
-}
+});

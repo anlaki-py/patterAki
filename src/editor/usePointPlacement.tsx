@@ -19,8 +19,9 @@ export function usePointPlacement(scale: number) {
   const [session, setSession] = useState<
     (PlacementSession & { cancelVersion: number }) | null
   >(null);
-  const s = useEditor();
-  const active = session?.cancelVersion === s.cancelVersion ? session : null;
+  const cancelVersion = useEditor((s) => s.cancelVersion);
+  const preview = useEditor((s) => s.preview);
+  const active = session?.cancelVersion === cancelVersion ? session : null;
   const close = () => {
     useEditor.setState({ preview: null });
     setSession(null);
@@ -59,8 +60,7 @@ export function usePointPlacement(scale: number) {
       notifications.show({ color: "red", message: (e as Error).message });
     }
   };
-  const target = active?.target,
-    preview = s.preview;
+  const target = active?.target;
   const p = target && preview?.points[target.pointId];
   return {
     open,

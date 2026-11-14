@@ -7,14 +7,15 @@ import type { AnnotationSession } from "./annotationEdit";
 import { createId } from "./ids";
 import { useEditor } from "./store";
 export function useAnnotationEditor() {
-  const s = useEditor();
+  const cancelVersion = useEditor((s) => s.cancelVersion);
+  const revision = useEditor((s) => s.revision);
   const [session, setSession] = useState<AnnotationSession | null>(null);
   const active =
     session &&
-    session.cancelVersion === s.cancelVersion &&
-    session.revision === s.revision;
+    session.cancelVersion === cancelVersion &&
+    session.revision === revision;
   const open = (annotation: Annotation) => {
-    s.cancel();
+    useEditor.getState().cancel();
     const state = useEditor.getState();
     useEditor.setState({
       tool: "select",

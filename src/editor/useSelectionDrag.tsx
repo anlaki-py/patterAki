@@ -15,9 +15,17 @@ import {
   type SelectionDragInfo,
 } from "./selectionDrag";
 import { useEditor } from "./store";
+import { useShallow } from "zustand/react/shallow";
 
 export function useSelectionDrag(scale: number, cursor: Vec2) {
-  const s = useEditor();
+  const s = useEditor(
+    useShallow((state) => ({
+      cancelVersion: state.cancelVersion,
+      revision: state.revision,
+      tool: state.tool,
+      units: state.document.unitsDisplay,
+    })),
+  );
   const drag = useRef<SelectionDrag | null>(null);
   const lock = useRef<ReturnType<typeof resolveGroupMovement>["lock"]>(null);
   const [box, setBox] = useState<Bounds | null>(null);
@@ -138,8 +146,8 @@ export function useSelectionDrag(scale: number, cursor: Vec2) {
               issue ? "measurement invalid-measurement" : "measurement"
             }
           >
-            ΔX {formatLength(delta.x, s.document.unitsDisplay)} · ΔY{" "}
-            {formatLength(delta.y, s.document.unitsDisplay)}
+            ΔX {formatLength(delta.x, s.units)} · ΔY{" "}
+            {formatLength(delta.y, s.units)}
             {axis === "x" ? " · X only" : axis === "y" ? " · Y only" : ""}
           </text>
         )}

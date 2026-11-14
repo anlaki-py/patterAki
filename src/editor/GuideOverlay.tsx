@@ -1,8 +1,9 @@
+import { memo } from "react";
 import type { PatternDocument } from "../document/schema";
 
 type View = { x: number; y: number; scale: number };
 
-export function GuideOverlay({
+export const GuideOverlay = memo(function GuideOverlay({
   doc,
   view,
   selectedGuide,
@@ -91,4 +92,4 @@ export function GuideOverlay({
       )}
     </g>
   );
-}
+});

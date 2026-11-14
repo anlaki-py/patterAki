@@ -1,9 +1,10 @@
+import { memo } from "react";
 import type { PatternDocument } from "../document/schema";
 import { formatLength } from "../document/schema";
 import { useEditor } from "./store";
 import { liveDimensions } from "./dimensions";
 
-export function DimensionOverlay({
+export const DimensionOverlay = memo(function DimensionOverlay({
   base,
   doc,
   selected,
@@ -89,4 +90,4 @@ export function DimensionOverlay({
       )}
     </g>
   );
-}
+});
