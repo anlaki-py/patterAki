@@ -349,3 +349,11 @@ Curve editing now leaves straight edges unchanged on a click or pickup movement 
 The new controller tests cover these behaviors without a browser. Browser checks remain pending for curve pickup, foreign-pointer/capture events, final release, focus behavior and Undo/Redo through the actual controls. This change does not implement pinch gestures or complete mobile acceptance.
 
 Verification on 2026-11-14: all 619 unit tests, lint, formatting and production build pass on Node 24.18.1. The build retains a warning for the approximately 1.09 MB main JavaScript chunk. No browser or physical-print checks were run for this change.
+
+## Focus loss preserves unfinished work
+
+Switching windows or tabs preserves placed Line/Polyline points, a rectangle's origin and numeric draft input. Idle property previews remain open. Focus loss releases temporary Space/Alt state and clears snap/auto-pan samples. A pressed move, curve bend, guide drag or pan is interrupted without committing geometry or creating history; a delayed release cannot commit it after focus returns. Draft points remain available to continue or Finish, including after temporary Space-pan. Escape, Cancel, tool changes and project replacement retain their explicit discard behavior. Unfinished drafts remain transient and are not autosaved.
+
+Unit regressions cover draft/history preservation, invalid-preview cleanup, synchronous curve/group interruption, delayed controller events and explicit cancellation/tool changes. Three added Playwright scenarios cover draft coordinates/exact input, cancelled edge dragging and temporary pan. They were not run in this environment. Real focus changes, pointer capture, file-dialog behavior and physical devices remain pending browser acceptance.
+
+Focus-loss verification on 2026-11-14: all 626 unit tests, lint, formatting and production build pass on Node 24.18.1. The existing main-chunk size warning remains. Browser scenarios are added but unverified.

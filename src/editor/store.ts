@@ -57,6 +57,7 @@ type State = {
   redo: () => void;
   load: (doc: PatternDocument) => void;
   cancel: () => void;
+  interruptGesture: () => void;
   applySettings: (settings: EditorSettings) => void;
 };
 export const useEditor = create<State>((set, get) => ({
@@ -194,6 +195,14 @@ export const useEditor = create<State>((set, get) => ({
       hasDraft: false,
       moveDialogOpen: false,
       lengthDialogEdge: null,
+      gestureActive: false,
+      cancelVersion: s.cancelVersion + 1,
+    })),
+  // Focus loss ends a pressed gesture without discarding click-to-click drafts.
+  interruptGesture: () =>
+    set((s) => ({
+      preview: null,
+      previewIssue: null,
       gestureActive: false,
       cancelVersion: s.cancelVersion + 1,
     })),

@@ -143,6 +143,7 @@ export function EditorViewport() {
   const [width, setWidth] = useState<string | number>(18);
   const [height, setHeight] = useState<string | number>(24);
   const space = useRef(false);
+  const pointerInterrupted = useRef(false);
   const exactField = useRef<HTMLInputElement>(null);
   const lastDraftClick = useRef<{ time: number; x: number; y: number } | null>(
     null,
@@ -215,12 +216,14 @@ export function EditorViewport() {
     );
   };
 
-  const reset = () => {
-    setDraft([]);
+  const reset = ({ preserveDraft = false } = {}) => {
+    if (!preserveDraft) {
+      setDraft([]);
+      setExact("");
+    }
     draftPress.current = null;
     setDrag(null);
     setGuideDrag(null);
-    setExact("");
     setCursorState({
       point: cursorRef.current.point,
       label: "",
@@ -237,7 +240,8 @@ export function EditorViewport() {
     useEditor.getState().cancel();
   };
   useEffect(() => {
-    reset();
+    // Interruption retains hasDraft; explicit Cancel/load clear it first.
+    reset({ preserveDraft: useEditor.getState().hasDraft });
     // Intentionally reset only on cancel/tool changes; reset itself is stable
     // per render and adding it would clear every active draft.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -535,7 +539,20 @@ export function EditorViewport() {
     const blur = () => {
       space.current = false;
       setBypass(false);
-      s.cancel();
+      lock.current = null;
+      lastPointer.current = null;
+      lastMove.current = null;
+      vertexMoved.current = false;
+      pointerInterrupted.current = true;
+      const state = useEditor.getState();
+      if (
+        state.gestureActive ||
+        selectionDrag.active() ||
+        curveDrag.active() ||
+        drag ||
+        guideDrag
+      )
+        state.interruptGesture();
     };
     window.addEventListener("keydown", down, true);
     window.addEventListener("keyup", up);
@@ -632,6 +649,7 @@ export function EditorViewport() {
     }
     if (selectionDrag.active() || curveDrag.active() || drag || guideDrag)
       return;
+    pointerInterrupted.current = false;
     e.currentTarget.focus();
     e.currentTarget.setPointerCapture(e.pointerId);
     useEditor.setState({ gestureActive: true });
@@ -779,7 +797,7 @@ export function EditorViewport() {
       touch: e.pointerType === "touch",
       shift: e.shiftKey,
     };
-    if (guideDrag) {
+    if (guideDrag && !pointerInterrupted.current) {
       if (guideDrag.pointer !== e.pointerId) return;
       const point = position(e);
       const mm = guideDrag.axis === "x" ? point.x : point.y;
@@ -802,7 +820,7 @@ export function EditorViewport() {
       setCursorState(freeSnap(position(e)));
       return;
     }
-    if (drag && drag.pointer === e.pointerId) {
+    if (drag && !pointerInterrupted.current && drag.pointer === e.pointerId) {
       if (!drag.pointId) {
         setView({
           ...drag.view,
@@ -862,6 +880,7 @@ export function EditorViewport() {
   );
 
   const up = (e: PointerEvent<SVGSVGElement>) => {
+    if (pointerInterrupted.current) return;
     if (curveDrag.active() && !curveDrag.owns(e.pointerId)) return;
     const press = draftPress.current;
     if (press?.pointer === e.pointerId) {
@@ -1076,10 +1095,12 @@ export function EditorViewport() {
             onPointerMove={move}
             onPointerUp={up}
             onPointerCancel={(e) => {
+              if (pointerInterrupted.current) return;
               if (curveDrag.active() && !curveDrag.owns(e.pointerId)) return;
               abortGesture();
             }}
             onLostPointerCapture={(e) => {
+              if (pointerInterrupted.current) return;
               if (curveDrag.active() && !curveDrag.owns(e.pointerId)) return;
               if (
                 selectionDrag.active() ||

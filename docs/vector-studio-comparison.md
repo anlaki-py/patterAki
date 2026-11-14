@@ -66,10 +66,10 @@ The store previously treated a draft or preview as cancellable, but omitted `ges
 
 Two concrete examples deserve follow-up:
 
-- Its window `blur` listener calls `s.cancel()` unconditionally. That clears unfinished drawing/preview state when the user changes windows. This is visible in the source; the exact browser/file-dialog triggers were not exercised here.
+- Resolved in the focus-loss follow-up: its window `blur` listener previously called `s.cancel()` unconditionally, clearing unfinished drawing/preview state when changing windows. Focus loss now preserves click-to-click drafts and idle numeric previews, and interrupts pressed gestures separately. Regression controller tests pass; browser/file-dialog triggers remain unverified.
 - `resolvePointer.ts` keeps module-global `lastDraftOrigin` to compensate for pointer-down not explicitly receiving the drafting origin. Revision/tool/cancel guards limit leakage, but this is hidden state compensating for an incomplete caller contract.
 
-**Suggested next patch:** Extract the existing draft/vertex/guide controllers incrementally. Normalize input once and explicitly pass origin, pointer owner and opening revision. Decide separately what focus loss does to a pressed drag versus an unfinished click-to-click polyline. Do not silently broaden cancellation behavior.
+**Suggested next patch:** Extract the existing draft/vertex/guide controllers incrementally. Normalize input once and explicitly pass origin, pointer owner and opening revision. Retain the focus-loss distinction between interrupting pressed gestures and preserving unfinished click-to-click polylines.
 
 **Acceptance:** No-op clicks, foreign-pointer release, Escape followed by delayed events, tool/project change during drag, focus loss and final-position release all have controller coverage. Browser tests verify pointer-capture and focus wiring. Preserve exact typed dimensions and snap priorities.
 

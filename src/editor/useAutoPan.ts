@@ -31,6 +31,7 @@ export function useAutoPan(
     };
     const clear = () => {
       pointer.current = null;
+      pending.current = null;
     };
     const release = (event: PointerEvent) => {
       if (event.pointerType === "touch") clear();
