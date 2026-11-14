@@ -339,3 +339,13 @@ Verification on 2026-11-13: all 600 unit tests, lint, formatting and the product
 Inside-line label hotfix: the shaft gap uses the label layout width plus 2 mm clearance on each side. Regression tests cover 40, 60 and 100 mm grainlines and short attached marks so the shaft remains visible wherever the label leaves space. Labels wider than the arrow still occupy the whole shaft. No browser tests were run for this hotfix.
 
 Tiled PDF exports retain a separate first page for measurement verification. Pattern sheets still have no page text or reserved text bands; one-large-sheet exports remain pattern-only.
+
+## Vector Studio comparison and focused gesture fixes
+
+The [2026-11-14 comparison report](docs/vector-studio-comparison.md) reviews architecture, interaction, rendering, snapping, history, storage, export and verification against the local Vector Studio source. It ranks remaining work and explains which existing choices to retain. Those recommendations are report-only.
+
+Curve editing now leaves straight edges unchanged on a click or pickup movement under 3 CSS pixels. A drag previews from its original geometry, uses the final release position and commits once. Returning to the pickup point makes no geometry edit. Handle pickup preserves its offset. Curve gestures reject foreign pointers and become inactive immediately after cancellation, document revision changes or tool changes. Invalid bends and out-of-range releases retain the committed drawing. Undo/Redo now cancel a pointer gesture before its first preview instead of traversing document history.
+
+The new controller tests cover these behaviors without a browser. Browser checks remain pending for curve pickup, foreign-pointer/capture events, final release, focus behavior and Undo/Redo through the actual controls. This change does not implement pinch gestures or complete mobile acceptance.
+
+Verification on 2026-11-14: all 619 unit tests, lint, formatting and production build pass on Node 24.18.1. The build retains a warning for the approximately 1.09 MB main JavaScript chunk. No browser or physical-print checks were run for this change.

@@ -111,7 +111,7 @@ export function EditorViewport() {
   const canvas = useRef<HTMLDivElement>(null);
   const [view, setView] = useState({ x: 40, y: 40, scale: 2 });
   const [size, setSize] = useState({ width: 0, height: 0 });
-  const curveDrag = useCurveDrag();
+  const curveDrag = useCurveDrag(view.scale);
   const annotations = useAnnotationEditor();
   const placement = usePointPlacement(view.scale);
   const [division, setDivision] = useState<DivisionSession | null>(null);
@@ -630,7 +630,8 @@ export function EditorViewport() {
         y: e.clientY,
       };
     }
-    if (selectionDrag.active() || drag || guideDrag) return;
+    if (selectionDrag.active() || curveDrag.active() || drag || guideDrag)
+      return;
     e.currentTarget.focus();
     e.currentTarget.setPointerCapture(e.pointerId);
     useEditor.setState({ gestureActive: true });
@@ -771,6 +772,7 @@ export function EditorViewport() {
   };
 
   const move = (e: CanvasPointer) => {
+    if (curveDrag.active() && !curveDrag.owns(e.pointerId)) return;
     lastMove.current = {
       point: position(e),
       pointer: e.pointerId,
@@ -860,6 +862,7 @@ export function EditorViewport() {
   );
 
   const up = (e: PointerEvent<SVGSVGElement>) => {
+    if (curveDrag.active() && !curveDrag.owns(e.pointerId)) return;
     const press = draftPress.current;
     if (press?.pointer === e.pointerId) {
       draftPress.current = null;
@@ -870,7 +873,7 @@ export function EditorViewport() {
       shiftKey: e.shiftKey,
       altKey: e.altKey,
     });
-    curveDrag.finish(e.pointerId);
+    curveDrag.finish(position(e), e.pointerId, e.altKey);
     if (drag?.pointer === e.pointerId && drag.pointId) {
       const state = useEditor.getState();
       if (state.preview && state.previewIssue) {
@@ -1072,8 +1075,12 @@ export function EditorViewport() {
             onPointerDown={down}
             onPointerMove={move}
             onPointerUp={up}
-            onPointerCancel={() => abortGesture()}
-            onLostPointerCapture={() => {
+            onPointerCancel={(e) => {
+              if (curveDrag.active() && !curveDrag.owns(e.pointerId)) return;
+              abortGesture();
+            }}
+            onLostPointerCapture={(e) => {
+              if (curveDrag.active() && !curveDrag.owns(e.pointerId)) return;
               if (
                 selectionDrag.active() ||
                 curveDrag.active() ||

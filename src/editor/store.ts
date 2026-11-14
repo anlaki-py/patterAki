@@ -126,7 +126,7 @@ export const useEditor = create<State>((set, get) => ({
   },
   undo: () => {
     const s = get();
-    if (s.preview || s.hasDraft) {
+    if (s.preview || s.hasDraft || s.gestureActive) {
       s.cancel();
       return;
     }
@@ -147,7 +147,7 @@ export const useEditor = create<State>((set, get) => ({
   },
   redo: () => {
     const s = get();
-    if (s.hasDraft || s.preview) {
+    if (s.hasDraft || s.preview || s.gestureActive) {
       s.cancel();
       return;
     }

@@ -99,7 +99,7 @@ export const commands = {
     () => useEditor.getState().undo(),
     () => {
       const s = useEditor.getState();
-      return s.past.length > 0 || s.hasDraft || !!s.preview;
+      return s.past.length > 0 || s.hasDraft || !!s.preview || s.gestureActive;
     },
     [{ key: "z", mod: true }],
   ),
@@ -109,7 +109,9 @@ export const commands = {
     () => useEditor.getState().redo(),
     () => {
       const s = useEditor.getState();
-      return s.future.length > 0 || s.hasDraft || !!s.preview;
+      return (
+        s.future.length > 0 || s.hasDraft || !!s.preview || s.gestureActive
+      );
     },
     [
       { key: "z", mod: true, shift: true },

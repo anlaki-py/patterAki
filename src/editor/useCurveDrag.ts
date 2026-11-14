@@ -1,100 +1,54 @@
-import { itemEditable } from "../document/pieceAccess";
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import { notifications } from "@mantine/notifications";
-import { bendCurve, convertToCurve, moveHandle } from "../document/curves";
-import { validateDocumentEdit } from "../document/contourValidation";
-import { segmentProjection } from "../document/segments";
-import type { PatternDocument } from "../document/schema";
-import { formatContourIssues } from "../geometry/contourValidation";
+import { beginCurveDrag, type CurveDrag } from "./curveDrag";
 import type { Vec2 } from "../geometry/line";
 import { useEditor } from "./store";
-type CurveDrag = {
-  pointer: number;
-  edgeId: string;
-  handle?: "control1" | "control2";
-  start: Vec2;
-  t: number;
-  base: PatternDocument;
-};
-export function useCurveDrag() {
+
+export function useCurveDrag(scale: number) {
   const drag = useRef<CurveDrag | null>(null);
-  const cancelVersion = useEditor((s) => s.cancelVersion);
-  useEffect(() => {
+  const report = (error: unknown) => {
     drag.current = null;
-  }, [cancelVersion]);
-  const begin = (target: SVGElement, point: Vec2, pointer: number) => {
-    const s = useEditor.getState(),
-      handle = target.dataset.handle,
-      edgeId =
+    notifications.show({
+      color: "red",
+      message: `Curve edit cancelled. ${error instanceof Error ? error.message : "The curve could not be edited."}`,
+    });
+  };
+  return {
+    begin(target: SVGElement, point: Vec2, pointer: number) {
+      if (drag.current?.active()) return false;
+      const s = useEditor.getState();
+      const handle = target.dataset.handle;
+      const edgeId =
         target.dataset.handleEdge ??
         (s.tool === "curve" ? target.dataset.edge : undefined);
-    if (
-      !edgeId ||
-      !s.document.segments[edgeId] ||
-      !itemEditable(s.document, edgeId)
-    )
-      return false;
-    const t = segmentProjection(s.document, s.document.segments[edgeId], point);
-    drag.current = {
-      pointer,
-      edgeId,
-      handle:
-        handle === "control1" || handle === "control2" ? handle : undefined,
-      start: point,
-      t: Math.max(0.05, Math.min(0.95, t)),
-      base: s.document,
-    };
-    useEditor.setState({
-      selected: [edgeId],
-      activePoint:
-        handle === "control2"
-          ? s.document.segments[edgeId].to
-          : s.document.segments[edgeId].from,
-      preview: convertToCurve(s.document, edgeId),
-      previewIssue: null,
-    });
-    return true;
-  };
-  const move = (point: Vec2, pointer: number, alt = false) => {
-    const d = drag.current;
-    if (!d || d.pointer !== pointer) return false;
-    const preview = d.handle
-      ? moveHandle(d.base, d.edgeId, d.handle, point, alt)
-      : bendCurve(d.base, d.edgeId, d.t, {
-          x: point.x - d.start.x,
-          y: point.y - d.start.y,
-        });
-    const check = validateDocumentEdit(d.base, preview);
-    useEditor.setState({
-      preview,
-      previewIssue: check.valid ? null : formatContourIssues(check),
-    });
-    return true;
-  };
-  const finish = (pointer: number) => {
-    const d = drag.current;
-    if (!d || d.pointer !== pointer) return;
-    drag.current = null;
-    const s = useEditor.getState();
-    if (s.previewIssue) {
-      const message = s.previewIssue;
-      s.cancel();
-      notifications.show({
-        color: "red",
-        message: `Curve edit cancelled. ${message}`,
+      if (!edgeId) return false;
+      drag.current = beginCurveDrag({
+        edgeId,
+        handle:
+          handle === "control1" || handle === "control2" ? handle : undefined,
+        point,
+        pointer,
+        scale,
       });
-      return;
-    }
-    try {
-      if (s.preview) s.commit(s.preview);
-    } catch {
-      s.cancel();
-      notifications.show({
-        color: "red",
-        message:
-          "Curve coordinates are outside the supported range. Edit cancelled.",
-      });
-    }
+      return !!drag.current;
+    },
+    move(point: Vec2, pointer: number, alt = false) {
+      try {
+        return drag.current?.move(point, pointer, alt) ?? false;
+      } catch (error) {
+        useEditor.getState().cancel();
+        report(error);
+        return true;
+      }
+    },
+    finish(point: Vec2, pointer: number, alt = false) {
+      try {
+        if (drag.current?.finish(point, pointer, alt)) drag.current = null;
+      } catch (error) {
+        report(error);
+      }
+    },
+    active: () => drag.current?.active() ?? false,
+    owns: (pointer: number) => drag.current?.owns(pointer) ?? false,
   };
-  return { begin, move, finish, active: () => drag.current !== null };
 }
